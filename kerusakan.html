@@ -34,6 +34,7 @@
   <button id="btnTXT">Export TXT</button>
   <button id="btnToggle">Tampilkan / Sembunyikan Data</button>
   <button id="btnClear" style="background:#ffdddd">Reset Semua Data</button>
+  <button id="btnOpenAll">Buka Semua di Maps</button>
 </div>
 
 <div id="status">Menunggu aksi...</div>
@@ -44,9 +45,7 @@
   <table id="dataTable"></table>
 </div>
 
-<!-- Script di bagian paling bawah -->
 <script>
-/* DEBUG HELPER - tampilkan info load script */
 console.log("ROBUST SCRIPT: mulai eksekusi");
 document.getElementById('debug').textContent = "Script loaded: " + new Date().toLocaleString();
 
@@ -106,7 +105,7 @@ function getLocationAndSave(type) {
   }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
 }
 
-/* RENDER TABLE */
+/* RENDER TABLE dengan link langsung ke Google Maps */
 function renderTable() {
   const table = document.getElementById("dataTable");
   if (!data || data.length === 0) {
@@ -117,8 +116,8 @@ function renderTable() {
   data.forEach(item => {
     html += "<tr>" +
       "<td>" + escapeHtml(item.type) + "</td>" +
-      "<td>" + Number(item.lat).toFixed(6) + "</td>" +
-      "<td>" + Number(item.lng).toFixed(6) + "</td>" +
+      "<td><a href='" + item.gmaps + "' target='_blank'>" + Number(item.lat).toFixed(6) + "</a></td>" +
+      "<td><a href='" + item.gmaps + "' target='_blank'>" + Number(item.lng).toFixed(6) + "</a></td>" +
       "<td>" + item.time + "</td>" +
       "<td>" +
         "<button class='small-btn' data-id='" + item.id + "' data-action='edit'>Edit</button>" +
@@ -174,6 +173,18 @@ function download(content, filename, type) {
   URL.revokeObjectURL(url);
 }
 
+/* BUKA SEMUA DI MAPS */
+function openAllInMaps() {
+  if (data.length === 0) return alert("Belum ada data.");
+  
+  const base = "https://www.google.com/maps/dir/?api=1";
+  const destination = data[data.length-1].lat + "," + data[data.length-1].lng;
+  const waypoints = data.slice(0, -1).map(d => d.lat + "," + d.lng).join("|");
+  const url = base + "&destination=" + destination + (waypoints ? "&waypoints=" + waypoints : "");
+  
+  window.open(url, "_blank");
+}
+
 /* UTIL: escape html */
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
 
@@ -186,7 +197,7 @@ function clearAllData() {
   document.getElementById("status").textContent = "Semua data dihapus.";
 }
 
-/* BUTTON BINDINGS (dipanggil setelah DOM ready) */
+/* BUTTON BINDINGS */
 function setupBindings() {
   // utama
   document.getElementById("btnLubang").addEventListener("click", () => getLocationAndSave("Lubang"));
@@ -208,6 +219,7 @@ function setupBindings() {
     if (el.style.display === "block") renderTable();
   });
   document.getElementById("btnClear").addEventListener("click", clearAllData);
+  document.getElementById("btnOpenAll").addEventListener("click", openAllInMaps);
 
   // delegated handlers for edit/delete in table
   document.getElementById("dataTable").addEventListener("click", (ev) => {
