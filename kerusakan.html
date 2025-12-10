@@ -1,189 +1,128 @@
 <!DOCTYPE html>
-<html lang="id">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pencatat Kerusakan Jalan - Modern</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Pencatat Kerusakan Jalan - Mobile Friendly</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
 <style>
-  /* Reset & Font */
-  * { box-sizing: border-box; margin:0; padding:0; }
-  body { font-family: 'Inter', sans-serif; background:#f4f6f8; color:#333; padding:20px; }
-
-  h2 { text-align:center; margin-bottom:20px; color:#1a73e8; }
-
-  /* Buttons grid */
-  .btn-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:12px; margin-bottom:16px; }
-  button { padding:12px; font-size:14px; border:none; border-radius:8px; cursor:pointer; transition:0.2s; font-weight:600; }
-  button:hover { opacity:0.9; }
-  #btnLubang { background:#ff595e; color:white; }
-  #btnRetak { background:#ffca3a; color:#333; }
-  #btnRumput { background:#8ac926; color:white; }
-  #btnJembul { background:#1982c4; color:white; }
-  #btnAmblas { background:#6a4c93; color:white; }
-  #btnLain { background:#ffb7b2; color:#333; }
-
-  /* Utilities buttons */
-  .utility-buttons { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-bottom:16px; }
-  .utility-buttons button { background:#e0e0e0; color:#333; }
-  .utility-buttons button:hover { background:#d5d5d5; }
-
-  #btnClear { background:#ff6b6b; color:white; }
-
-  /* Status & Debug */
-  #status { margin-bottom:12px; font-weight:600; text-align:center; min-height:1.2em; }
-  #debug { font-size:12px; color:#777; margin-bottom:12px; text-align:left; }
-
-  /* Table */
-  #tableContainer { display:none; background:white; border-radius:10px; padding:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1); margin-bottom:16px; overflow-x:auto; }
-  table { width:100%; border-collapse:collapse; }
-  th, td { padding:8px 12px; text-align:center; font-size:13px; }
-  th { background:#e8f0fe; color:#333; font-weight:600; }
-  tr:nth-child(even) { background:#f9f9f9; }
-  .small-btn { padding:4px 8px; font-size:12px; border-radius:6px; cursor:pointer; border:none; transition:0.2s; }
-  .small-btn:hover { opacity:0.8; }
-  .small-btn[data-action="edit"] { background:#4caf50; color:white; }
-  .small-btn[data-action="delete"] { background:#f44336; color:white; }
-
-  /* Map */
-  #map { width:100%; height:450px; border-radius:10px; display:none; margin-bottom:20px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f9f9f9; text-align:center; }
+h2 { color:#333; margin:10px 0; font-size:18px; }
+.btn-grid { display:grid; grid-template-columns: repeat(2,1fr); gap:10px; margin:10px; }
+button { padding:14px; font-size:16px; border-radius:10px; cursor:pointer; border:none; color:white; transition:0.2s; }
+button:hover { opacity:0.85; }
+#status { margin:5px 10px; font-weight:bold; min-height:1.2em; color:#555; font-size:14px; }
+table { width:100%; border-collapse:collapse; margin-top:10px; background:white; box-shadow:0 0 6px rgba(0,0,0,0.1); font-size:12px; }
+th, td { border:1px solid #bbb; padding:6px; text-align:center; }
+th { background:#eee; }
+.small-btn { padding:4px 6px; font-size:12px; margin:2px; border-radius:5px; cursor:pointer; }
+.edit-btn { background:#2196F3; color:white; border:none; }
+.gmaps-btn { background:#FF9800; color:white; border:none; }
+.delete-btn { background:#f44336; color:white; border:none; }
+#debug { font-size:12px; color:#666; margin:5px 10px; text-align:left;}
+#toast { visibility:hidden; min-width:200px; background-color:#333; color:#fff; text-align:center; border-radius:6px; padding:10px; position:fixed; z-index:1000; bottom:30px; left:50%; transform:translateX(-50%); font-size:14px; opacity:0; transition:opacity 0.5s,bottom 0.5s; }
+#toast.show { visibility:visible; opacity:1; bottom:50px; }
+#map { height:50vh; width:100%; border:1px solid #bbb; }
+.table-container { overflow-x:auto; margin:0 10px 10px 10px; }
 </style>
 </head>
 <body>
 
-<h2>Pencatat Kerusakan Jalan</h2>
+<h2>Pencatat Kerusakan Jalan - Mobile Friendly</h2>
 
 <div class="btn-grid" id="btnGrid">
-  <button id="btnLubang">Lubang</button>
-  <button id="btnRetak">Retak Buaya</button>
-  <button id="btnRumput">Rumput Tinggi</button>
-  <button id="btnJembul">Jembul</button>
-  <button id="btnAmblas">Amblas</button>
-  <button id="btnLain">Lain...</button>
+  <button id="btnLubang" style="background:#FF8A65">Lubang</button>
+  <button id="btnRetak" style="background:#4DB6AC">Retak Buaya</button>
+  <button id="btnRumput" style="background:#AED581">Rumput Tinggi</button>
+  <button id="btnJembul" style="background:#BA68C8">Jembul</button>
+  <button id="btnAmblas" style="background:#FFD54F;color:#333">Amblas</button>
+  <button id="btnLain" style="background:#90A4AE">Lain...</button>
 </div>
 
-<div class="utility-buttons">
-  <button id="btnCSV">Export CSV</button>
-  <button id="btnTXT">Export TXT</button>
-  <button id="btnToggle">Tampilkan / Sembunyikan Data</button>
-  <button id="btnClear">Reset Semua Data</button>
-  <button id="btnOpenMap">Buka Semua di Peta</button>
+<div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:5px 0;">
+  <button id="btnCSV" style="background:#607D8B">Export CSV</button>
+  <button id="btnTXT" style="background:#795548">Export TXT</button>
+  <button id="btnToggle" style="background:#009688">Tampilkan / Sembunyikan Tabel</button>
+  <button id="btnClear" style="background:#f44336">Reset Semua Data</button>
 </div>
 
 <div id="status">Menunggu aksi...</div>
 <div id="debug"></div>
 
-<div id="tableContainer">
+<div class="table-container" id="tableContainer" style="display:none;">
   <h3>Data Tersimpan</h3>
   <table id="dataTable"></table>
 </div>
 
 <div id="map"></div>
+<div id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-console.log("ROBUST SCRIPT: Modern UI loaded");
-document.getElementById('debug').textContent = "Script loaded: " + new Date().toLocaleString();
+// ===== SCRIPT =====
+console.log("Mobile-friendly ROBUST script loaded");
+document.getElementById('debug').textContent="Script loaded: "+new Date().toLocaleString();
 
-/* DATA */
 let data = JSON.parse(localStorage.getItem("jalan_data")) || [];
+let markers = [];
 
-/* UTILS */
-function saveToLocal() { localStorage.setItem("jalan_data", JSON.stringify(data)); }
-function formatWITA() {
-  const options = { timeZone:"Asia/Makassar", year:"numeric", month:"2-digit", day:"2-digit",
-    hour:"2-digit", minute:"2-digit", hour12:false };
-  const parts = new Intl.DateTimeFormat("en-GB", options).formatToParts(new Date());
-  const day = parts.find(p=>p.type==="day").value;
-  const month = parts.find(p=>p.type==="month").value;
-  const year = parts.find(p=>p.type==="year").value;
-  const hour = parts.find(p=>p.type==="hour").value;
-  const minute = parts.find(p=>p.type==="minute").value;
-  return `${day}-${month}-${year} ${hour}:${minute} WITA`;
+function saveToLocal(){ localStorage.setItem("jalan_data", JSON.stringify(data)); }
+function saveBackupAuto(){ localStorage.setItem("backup_jalan_auto", JSON.stringify(data)); console.log("Backup otomatis tersimpan:", new Date().toLocaleString()); }
+function restoreBackupAuto(){ 
+  const backup = JSON.parse(localStorage.getItem("backup_jalan_auto")||"[]"); 
+  if(backup.length && data.length===0){ data=backup; saveToLocal(); showToast("Restore otomatis dari backup terakhir!"); }
 }
+function formatWITA(){ const o={timeZone:"Asia/Makassar",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}; const p=new Intl.DateTimeFormat("en-GB",o).formatToParts(new Date()); return `${p.find(x=>x.type==="day").value}-${p.find(x=>x.type==="month").value}-${p.find(x=>x.type==="year").value} ${p.find(x=>x.type==="hour").value}:${p.find(x=>x.type==="minute").value} WITA`; }
+function showToast(msg,d=3000){ const t=document.getElementById("toast"); t.textContent=msg; t.className="show"; setTimeout(()=>{ t.className=""; }, d); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]); }
 
-/* GEOLOCATION & SAVE */
-function getLocationAndSave(type) {
+function getLocationAndSave(type){
   const statusEl = document.getElementById("status");
   if(!navigator.geolocation){ statusEl.textContent="GPS tidak tersedia."; return; }
   statusEl.textContent="Mengambil lokasi...";
   navigator.geolocation.getCurrentPosition(pos=>{
-    const lat=pos.coords.latitude, lng=pos.coords.longitude;
-    const entry={ id:Date.now(), type, lat, lng, acc:pos.coords.accuracy,
-      time:formatWITA(), gmaps:"https://www.google.com/maps?q="+lat+","+lng };
-    data.push(entry); saveToLocal(); renderTable();
-    statusEl.innerHTML=`Tersimpan: ${type}<br><a href='${entry.gmaps}' target='_blank'>Buka di Google Maps</a>`;
-  }, err=>{ statusEl.textContent="Gagal ambil lokasi: "+err.message; }, 
-  { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+    const entry = {id:Date.now(), type:type, lat:pos.coords.latitude, lng:pos.coords.longitude, acc:pos.coords.accuracy, time:formatWITA(), gmaps:`https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`};
+    data.push(entry); saveToLocal(); renderTable(); updateMapMarkers();
+    statusEl.innerHTML = `Tersimpan: ${type}<br><a href='${entry.gmaps}' target='_blank'>Buka di Google Maps</a>`;
+  }, err=>{ statusEl.textContent="Gagal ambil lokasi: "+err.message; }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
 }
 
-/* RENDER TABLE */
-function renderTable() {
-  const table=document.getElementById("dataTable");
+function renderTable(){
+  const table = document.getElementById("dataTable");
   if(!data.length){ table.innerHTML="<tr><td>Belum ada data.</td></tr>"; return; }
-  let html="<tr><th>Jenis</th><th>Lat</th><th>Lng</th><th>Waktu</th><th>Aksi</th></tr>";
+  let html = "<tr><th>Jenis</th><th>Lat</th><th>Lng</th><th>Waktu</th><th>Aksi</th></tr>";
   data.forEach(item=>{
-    html+="<tr>"+
-      "<td>"+escapeHtml(item.type)+"</td>"+
-      "<td><a href='"+item.gmaps+"' target='_blank'>"+item.lat.toFixed(6)+"</a></td>"+
-      "<td><a href='"+item.gmaps+"' target='_blank'>"+item.lng.toFixed(6)+"</a></td>"+
-      "<td>"+item.time+"</td>"+
-      "<td><button class='small-btn' data-id='"+item.id+"' data-action='edit'>Edit</button>"+
-      "<button class='small-btn' data-id='"+item.id+"' data-action='delete'>Hapus</button></td>"+
-      "</tr>";
+    html += `<tr>
+      <td>${escapeHtml(item.type)}</td>
+      <td>${Number(item.lat).toFixed(6)}</td>
+      <td>${Number(item.lng).toFixed(6)}</td>
+      <td>${item.time}</td>
+      <td>
+        <button class='small-btn edit-btn' data-id='${item.id}' data-action='edit'>Edit</button>
+        <button class='small-btn gmaps-btn' data-id='${item.id}' data-action='gmaps'>Gmaps</button>
+        <button class='small-btn delete-btn' data-id='${item.id}' data-action='delete'>Hapus</button>
+      </td>
+    </tr>`;
   });
-  table.innerHTML=html;
+  table.innerHTML = html;
 }
 
-/* EDIT / DELETE */
-function editItemById(id){
-  const idx=data.findIndex(x=>x.id===id); if(idx===-1) return;
-  const newType=prompt("Edit jenis kerusakan:", data[idx].type); if(!newType) return;
-  data[idx].type=newType; saveToLocal(); renderTable();
-}
-function deleteItemById(id){
-  if(!confirm("Hapus data ini?")) return;
-  data=data.filter(x=>x.id!==id); saveToLocal(); renderTable();
-}
+function editItemById(id){ const idx=data.findIndex(x=>x.id===id); if(idx===-1)return; const newType=prompt("Edit jenis kerusakan:", data[idx].type); if(!newType)return; data[idx].type=newType; saveToLocal(); renderTable(); updateMapMarkers(); }
+function deleteItemById(id){ if(!confirm("Hapus data ini?"))return; data=data.filter(x=>x.id!==id); saveToLocal(); renderTable(); updateMapMarkers(); }
+function openGmapsSingle(id){ const item=data.find(x=>x.id===id); if(!item)return; window.open(item.gmaps,"_blank"); }
 
-/* EXPORT */
-function exportCSV(){ if(!data.length)return alert("Belum ada data."); 
-  let csv="type,lat,lng,accuracy,time,gmaps\n";
-  data.forEach(i=>{csv+='"'+i.type.replace(/"/g,'""')+'",'+i.lat+','+i.lng+','+i.acc+',"'+i.time+'","'+i.gmaps+'"\n';});
-  download(csv,"data_jalan.csv","text/csv");
-}
-function exportTXT(){ if(!data.length)return alert("Belum ada data.");
-  let txt=""; data.forEach(i=>{txt+="Tipe: "+i.type+"\nLat: "+i.lat+"\nLng: "+i.lng+"\nAkurasi: "+i.acc+"\nWaktu: "+i.time+"\nMaps: "+i.gmaps+"\n\n";});
-  download(txt,"data_jalan.txt","text/plain");
-}
-function download(content,filename,type){ const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob);
-  const a=document.createElement("a"); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
-}
+function exportCSV(){ if(!data.length) return alert("Belum ada data."); let csv="type,lat,lng,accuracy,time,gmaps\n"; data.forEach(i=>{ csv+=`"${i.type.replace(/"/g,'""')}",${i.lat},${i.lng},${i.acc},"${i.time}","${i.gmaps}"\n`; }); download(csv,"data_jalan_"+new Date().toISOString().replace(/[:.]/g,'-')+".csv","text/csv"); }
+function exportTXT(){ if(!data.length) return alert("Belum ada data."); let text=""; data.forEach(i=>{ text+=`Tipe: ${i.type}\nLat: ${i.lat}\nLng: ${i.lng}\nAkurasi: ${i.acc}\nWaktu: ${i.time}\nMaps: ${i.gmaps}\n\n`; }); download(text,"data_jalan_"+new Date().toISOString().replace(/[:.]/g,'-')+".txt","text/plain"); }
+function download(content, filename, type){ const blob=new Blob([content],{type:type}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
 
-/* OPEN MAP */
-function openAllInMap(){
-  if(!data.length) return alert("Belum ada data.");
-  const mapDiv=document.getElementById("map"); mapDiv.style.display="block"; mapDiv.innerHTML="";
-  const map=L.map('map').setView([data[0].lat,data[0].lng],14);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
-  }).addTo(map);
-  data.forEach(item=>{
-    L.marker([item.lat,item.lng]).addTo(map)
-      .bindPopup(`<b>${escapeHtml(item.type)}</b><br>${item.time}<br><a href='${item.gmaps}' target='_blank'>Google Maps</a>`);
-  });
-}
+function clearAllData(){ if(!confirm("Hapus semua data?"))return; data=[]; saveToLocal(); renderTable(); updateMapMarkers(); document.getElementById("status").textContent="Semua data dihapus."; }
 
-/* UTIL */
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+const map = L.map('map').setView([0,0],2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'&copy; OpenStreetMap'}).addTo(map);
+function updateMapMarkers(){ markers.forEach(m=>map.removeLayer(m)); markers=[]; if(!data.length)return; data.forEach(item=>{ const m=L.marker([item.lat,item.lng]).addTo(map).bindPopup(`<b>${escapeHtml(item.type)}</b><br>Waktu: ${item.time}<br><a href="${item.gmaps}" target="_blank">Buka di Google Maps</a>`); markers.push(m); }); const group=L.featureGroup(markers); map.fitBounds(group.getBounds().pad(0.3)); }
 
-/* CLEAR ALL */
-function clearAllData(){ if(!confirm("Hapus semua data?")) return; data=[]; saveToLocal(); renderTable();
-  document.getElementById("status").textContent="Semua data dihapus."; document.getElementById("map").style.display="none";
-}
-
-/* BUTTONS */
 function setupBindings(){
   document.getElementById("btnLubang").addEventListener("click",()=>getLocationAndSave("Lubang"));
   document.getElementById("btnRetak").addEventListener("click",()=>getLocationAndSave("Retak Buaya"));
@@ -191,19 +130,29 @@ function setupBindings(){
   document.getElementById("btnJembul").addEventListener("click",()=>getLocationAndSave("Jembul"));
   document.getElementById("btnAmblas").addEventListener("click",()=>getLocationAndSave("Amblas"));
   document.getElementById("btnLain").addEventListener("click",()=>{ const info=prompt("Masukkan keterangan lain:"); if(info&&info.trim()!=="") getLocationAndSave(info.trim()); });
-
   document.getElementById("btnCSV").addEventListener("click",exportCSV);
   document.getElementById("btnTXT").addEventListener("click",exportTXT);
   document.getElementById("btnToggle").addEventListener("click",()=>{ const el=document.getElementById("tableContainer"); el.style.display=(el.style.display==="none")?"block":"none"; if(el.style.display==="block") renderTable(); });
   document.getElementById("btnClear").addEventListener("click",clearAllData);
-  document.getElementById("btnOpenMap").addEventListener("click",openAllInMap);
-
-  document.getElementById("dataTable").addEventListener("click",(ev)=>{ const btn=ev.target.closest("button"); if(!btn) return; const id=Number(btn.getAttribute("data-id")); const action=btn.getAttribute("data-action"); if(action==="edit") editItemById(id); if(action==="delete") deleteItemById(id); });
+  document.getElementById("dataTable").addEventListener("click",(ev)=>{
+    const btn=ev.target.closest("button"); if(!btn)return;
+    const id=Number(btn.getAttribute("data-id")); 
+    const action=btn.getAttribute("data-action"); 
+    if(action==="edit") editItemById(id); 
+    if(action==="gmaps") openGmapsSingle(id);
+    if(action==="delete") deleteItemById(id);
+  });
 }
 
-/* INIT */
-document.addEventListener("DOMContentLoaded",()=>{ setupBindings(); renderTable(); document.getElementById('debug').textContent+=" | bindings OK"; });
-</script>
+document.addEventListener("DOMContentLoaded",()=>{
+  restoreBackupAuto();
+  setupBindings();
+  renderTable();
+  updateMapMarkers();
+  console.log("Mobile-friendly bindings OK, map ready.");
+});
 
+setInterval(saveBackupAuto, 3600000);
+</script>
 </body>
 </html>
