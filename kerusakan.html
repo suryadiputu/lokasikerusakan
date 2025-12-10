@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pencatat Kerusakan Jalan - Robust</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 18px; text-align: center; }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  button { padding: 12px; font-size: 15px; border-radius: 10px; cursor: pointer; }
+  #status { margin-top: 10px; font-weight: bold; min-height: 1.2em; }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+  th, td { border: 1px solid #bbb; padding: 6px; font-size: 13px; }
+  th { background:#eee; }
+  .small-btn { padding:4px 8px; font-size:12px; margin:2px; }
+  #debug { font-size:12px; color:#666; margin-top:8px; text-align:left;}
+</style>
+</head>
+<body>
+
+<h2>Pencatat Kerusakan Jalan</h2>
+
+<div class="btn-grid" id="btnGrid">
+  <button id="btnLubang">Lubang</button>
+  <button id="btnRetak">Retak Buaya</button>
+  <button id="btnRumput">Rumput Tinggi</button>
+  <button id="btnJembul">Jembul</button>
+  <button id="btnAmblas">Amblas</button>
+  <button id="btnLain">Lain...</button>
+</div>
+
+<div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:8px;">
+  <button id="btnCSV">Export CSV</button>
+  <button id="btnTXT">Export TXT</button>
+  <button id="btnToggle">Tampilkan / Sembunyikan Data</button>
+  <button id="btnClear" style="background:#ffdddd">Reset Semua Data</button>
+</div>
+
+<div id="status">Menunggu aksi...</div>
+<div id="debug"></div>
+
+<div id="tableContainer" style="display:none;">
+  <h3>Data Tersimpan</h3>
+  <table id="dataTable"></table>
+</div>
+
+<!-- Script di bagian paling bawah -->
+<script>
+/* DEBUG HELPER - tampilkan info load script */
+console.log("ROBUST SCRIPT: mulai eksekusi");
+document.getElementById('debug').textContent = "Script loaded: " + new Date().toLocaleString();
+
+/* DATA */
+let data = JSON.parse(localStorage.getItem("jalan_data")) || [];
+
+/* UTILS */
+function saveToLocal() {
+  localStorage.setItem("jalan_data", JSON.stringify(data));
+}
+
+/* FORMAT WITA */
+function formatWITA() {
+  const options = {
+    timeZone: "Asia/Makassar",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hour12: false
+  };
+  const formatter = new Intl.DateTimeFormat("en-GB", options);
+  const parts = formatter.formatToParts(new Date());
+  const day    = parts.find(p => p.type === "day").value;
+  const month  = parts.find(p => p.type === "month").value;
+  const year   = parts.find(p => p.type === "year").value;
+  const hour   = parts.find(p => p.type === "hour").value;
+  const minute = parts.find(p => p.type === "minute").value;
+  return `${day}-${month}-${year} ${hour}:${minute} WITA`;
+}
+
+/* LOCATION & SAVE */
+function getLocationAndSave(type) {
+  const statusEl = document.getElementById("status");
+  if (!navigator.geolocation) {
+    statusEl.textContent = "GPS tidak tersedia di perangkat ini.";
+    return;
+  }
+  statusEl.textContent = "Mengambil lokasi...";
+  navigator.geolocation.getCurrentPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const entry = {
+      id: Date.now(),
+      type: type,
+      lat: lat,
+      lng: lng,
+      acc: pos.coords.accuracy,
+      time: formatWITA(),
+      gmaps: "https://www.google.com/maps?q=" + lat + "," + lng
+    };
+    data.push(entry);
+    saveToLocal();
+    renderTable();
+    statusEl.innerHTML = "Tersimpan: " + type + "<br><a href='" + entry.gmaps + "' target='_blank'>Buka di Google Maps</a>";
+    console.log("Saved entry:", entry);
+  }, err => {
+    statusEl.textContent = "Gagal ambil lokasi: " + err.message;
+    console.warn("geolocation error:", err);
+  }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+}
+
+/* RENDER TABLE */
+function renderTable() {
+  const table = document.getElementById("dataTable");
+  if (!data || data.length === 0) {
+    table.innerHTML = "<tr><td>Belum ada data.</td></tr>";
+    return;
+  }
+  let html = "<tr><th>Jenis</th><th>Lat</th><th>Lng</th><th>Waktu</th><th>Aksi</th></tr>";
+  data.forEach(item => {
+    html += "<tr>" +
+      "<td>" + escapeHtml(item.type) + "</td>" +
+      "<td>" + Number(item.lat).toFixed(6) + "</td>" +
+      "<td>" + Number(item.lng).toFixed(6) + "</td>" +
+      "<td>" + item.time + "</td>" +
+      "<td>" +
+        "<button class='small-btn' data-id='" + item.id + "' data-action='edit'>Edit</button>" +
+        "<button class='small-btn' data-id='" + item.id + "' data-action='delete'>Hapus</button>" +
+      "</td>" +
+    "</tr>";
+  });
+  table.innerHTML = html;
+}
+
+/* HAPUS / EDIT */
+function editItemById(id) {
+  const idx = data.findIndex(x => x.id === id);
+  if (idx === -1) return;
+  const newType = prompt("Edit jenis kerusakan:", data[idx].type);
+  if (!newType) return;
+  data[idx].type = newType;
+  saveToLocal();
+  renderTable();
+}
+
+function deleteItemById(id) {
+  if (!confirm("Hapus data ini?")) return;
+  data = data.filter(x => x.id !== id);
+  saveToLocal();
+  renderTable();
+}
+
+/* EXPORT */
+function exportCSV() {
+  if (data.length === 0) return alert("Belum ada data.");
+  let csv = "type,lat,lng,accuracy,time,gmaps\n";
+  data.forEach(i => {
+    csv += '"' + i.type.replace(/"/g,'""') + '",' + i.lat + ',' + i.lng + ',' + i.acc + ',"' + i.time + '","' + i.gmaps + '"\n';
+  });
+  download(csv, "data_jalan.csv", "text/csv");
+}
+function exportTXT() {
+  if (data.length === 0) return alert("Belum ada data.");
+  let text = "";
+  data.forEach(i => {
+    text += "Tipe: " + i.type + "\nLat: " + i.lat + "\nLng: " + i.lng + "\nAkurasi: " + i.acc + "\nWaktu: " + i.time + "\nMaps: " + i.gmaps + "\n\n";
+  });
+  download(text, "data_jalan.txt", "text/plain");
+}
+function download(content, filename, type) {
+  const blob = new Blob([content], { type: type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* UTIL: escape html */
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];}); }
+
+/* CLEAR ALL */
+function clearAllData() {
+  if (!confirm("Hapus semua data?")) return;
+  data = [];
+  saveToLocal();
+  renderTable();
+  document.getElementById("status").textContent = "Semua data dihapus.";
+}
+
+/* BUTTON BINDINGS (dipanggil setelah DOM ready) */
+function setupBindings() {
+  // utama
+  document.getElementById("btnLubang").addEventListener("click", () => getLocationAndSave("Lubang"));
+  document.getElementById("btnRetak").addEventListener("click", () => getLocationAndSave("Retak Buaya"));
+  document.getElementById("btnRumput").addEventListener("click", () => getLocationAndSave("Rumput Tinggi"));
+  document.getElementById("btnJembul").addEventListener("click", () => getLocationAndSave("Jembul"));
+  document.getElementById("btnAmblas").addEventListener("click", () => getLocationAndSave("Amblas"));
+  document.getElementById("btnLain").addEventListener("click", () => {
+    const info = prompt("Masukkan keterangan lain:");
+    if (info && info.trim()!=="") getLocationAndSave(info.trim());
+  });
+
+  // utilities
+  document.getElementById("btnCSV").addEventListener("click", exportCSV);
+  document.getElementById("btnTXT").addEventListener("click", exportTXT);
+  document.getElementById("btnToggle").addEventListener("click", () => {
+    const el = document.getElementById("tableContainer");
+    el.style.display = (el.style.display === "none") ? "block" : "none";
+    if (el.style.display === "block") renderTable();
+  });
+  document.getElementById("btnClear").addEventListener("click", clearAllData);
+
+  // delegated handlers for edit/delete in table
+  document.getElementById("dataTable").addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button");
+    if (!btn) return;
+    const id = Number(btn.getAttribute("data-id"));
+    const action = btn.getAttribute("data-action");
+    if (action === "edit") editItemById(id);
+    if (action === "delete") deleteItemById(id);
+  });
+}
+
+/* DOM ready */
+document.addEventListener("DOMContentLoaded", () => {
+  try {
+    setupBindings();
+    renderTable();
+    console.log("Bindings set up OK. Functions available.");
+    document.getElementById('debug').textContent += " | bindings OK";
+  } catch (e) {
+    console.error("Setup error:", e);
+    document.getElementById("status").textContent = "Script setup error: " + e.message;
+  }
+});
+</script>
+</body>
+</html>
