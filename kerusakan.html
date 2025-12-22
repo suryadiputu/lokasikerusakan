@@ -3,258 +3,201 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pencatat Kerusakan Jalan</title>
+<title>Pencatat Kerusakan Jalan - PJN 1 Bali</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <style>
-body{font-family:Arial;margin:0;background:#f7f7f7;text-align:center}
+body{font-family:Arial;margin:0;background:#f5f5f5;text-align:center}
 h2{margin:8px;font-size:18px}
-button{padding:12px;font-size:15px;border:none;border-radius:10px;color:white}
 .btn-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px}
-.info-box{background:white;border-radius:8px;padding:8px;font-size:13px;text-align:left}
-.small-btn{font-size:12px;padding:5px 7px;border-radius:6px}
-#map{height:50vh}
-
-table{width:100%;border-collapse:collapse}
-th,td{
- border:1px solid #aaa;
- padding:4px;
- text-align:center;
- font-size:clamp(9px,2.5vw,12px)
-}
+button{padding:12px;font-size:15px;border-radius:10px;border:none;color:#fff}
+.small-btn{padding:4px 6px;font-size:12px;border-radius:5px}
+.edit-btn{background:#2196F3}
+.gmaps-btn{background:#FF9800}
+.delete-btn{background:#f44336}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th,td{border:1px solid #bbb;padding:4px}
 th{background:#eee}
-
-.action-btn{font-size:11px;padding:4px 6px;border-radius:6px}
-.edit-btn{background:#1E88E5}
-.gmap-btn{background:#FB8C00}
-.del-btn{background:#E53935}
-
-#toast{
- position:fixed;
- bottom:30px;left:50%;
- transform:translateX(-50%);
- background:#D32F2F;
- color:white;
- padding:8px 12px;
- border-radius:6px;
- opacity:0;
- transition:.3s;
- z-index:999
-}
-#toast.show{opacity:1}
+#map{height:45vh}
+.flex2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px}
+.box{background:#fff;padding:6px;border-radius:8px;font-size:12px}
+#toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+background:#333;color:#fff;padding:8px;border-radius:6px;display:none}
 </style>
 </head>
 
 <body>
-
-<h2>Pencatat Kerusakan Jalan</h2>
+<h2>Pencatat Kerusakan Jalan – PJN 1 Bali</h2>
 
 <div class="btn-grid">
- <button style="background:#FF8A65" onclick="savePoint('Lubang')">Lubang</button>
- <button style="background:#4DB6AC" onclick="savePoint('Retak Buaya')">Retak Buaya</button>
- <button style="background:#AED581;color:#333" onclick="savePoint('Rumput Tinggi')">Rumput Tinggi</button>
- <button style="background:#BA68C8" onclick="savePoint('Jembul')">Jembul</button>
- <button style="background:#FFD54F;color:#333" onclick="savePoint('Amblas')">Amblas</button>
- <button style="background:#90A4AE" onclick="customType()">Lainnya</button>
+<button style="background:#FF8A65" onclick="savePoint('Lubang')">Lubang</button>
+<button style="background:#4DB6AC" onclick="savePoint('Retak Buaya')">Retak Buaya</button>
+<button style="background:#AED581" onclick="savePoint('Rumput Tinggi')">Rumput Tinggi</button>
+<button style="background:#BA68C8" onclick="savePoint('Jembul')">Jembul</button>
+<button style="background:#FFD54F;color:#333" onclick="savePoint('Amblas')">Amblas</button>
+<button style="background:#90A4AE" onclick="customType()">Lain…</button>
 </div>
 
 <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
- <button style="background:#455A64" onclick="toggleSummary()">Ringkasan Ruas</button>
- <button style="background:#607D8B" onclick="exportCSV()">Export CSV</button>
- <button style="background:#795548" onclick="exportTXT()">Export TXT</button>
- <button style="background:#009688" onclick="toggleTable()">Data</button>
+<button style="background:#455A64" onclick="toggleSummary()">Ringkasan Ruas</button>
+<button style="background:#607D8B" onclick="exportCSV()">Export CSV</button>
+<button style="background:#795548" onclick="exportTXT()">Export TXT</button>
+<button style="background:#009688" onclick="toggleTable()">Data</button>
+<button style="background:#1976D2" onclick="refreshLocation()">Refresh Lokasi</button>
+<button style="background:#D32F2F" onclick="clearAll()">Clear Data</button>
 </div>
 
-<div class="info-grid">
- <div class="info-box">
-  <b>Lokasi Saat Ini</b><br>
-  Ruas: <span id="liveRuas">-</span><br>
-  STA: <span id="liveSTA">-</span><br><br>
-  <button class="small-btn" style="background:#03A9F4;color:white" onclick="refreshLive()">🔄 Refresh</button>
- </div>
- <div class="info-box" id="lastInfo">
-  <b>Data Terakhir</b><br>-
- </div>
+<div class="flex2">
+<div class="box" id="currentInfo"><b>Lokasi Saat Ini</b><br>-</div>
+<div class="box" id="lastInfo"><b>Data Terakhir</b><br>-</div>
 </div>
 
-<div id="summaryWrap" style="display:none"></div>
-<div id="tableWrap" style="display:none"><table id="dataTable"></table></div>
+<div id="summaryBox" style="display:none" class="box"></div>
+
+<div id="tableBox" style="display:none" class="box">
+<table id="dataTable"></table>
+</div>
+
 <div id="map"></div>
 <div id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-let ROADS=[],data=JSON.parse(localStorage.getItem("jalan_data"))||[];
-let liveMarker=null;
+let ROADS=[],data=JSON.parse(localStorage.getItem("jalan_data")||"[]");
+let map=L.map("map").setView([-8.5,115.2],10);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
+let markers=[],liveMarker=null;
 
 fetch("roads.json").then(r=>r.json()).then(j=>ROADS=j);
 
-const R=6371000,d=Math.PI/180;
-const hav=(a,b,c,e)=>{
- const x=Math.sin((c-a)*d/2)**2+
- Math.cos(a*d)*Math.cos(c*d)*Math.sin((e-b)*d/2)**2;
- return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
-};
-const sta=m=>`STA ${Math.floor(m/1000)}+${String(Math.round(m%1000)).padStart(3,"0")}`;
-const toast=m=>{
- const t=document.getElementById("toast");
- t.textContent=m;t.className="show";
- setTimeout(()=>t.className="",3500);
-};
-const timeWITA=()=>new Date().toLocaleString("id-ID",{timeZone:"Asia/Makassar"})+" WITA";
+function toast(t){let x=document.getElementById("toast");x.innerText=t;x.style.display="block";setTimeout(()=>x.style.display="none",2500)}
 
-function findNearest(lat,lng){
- let best={dist:Infinity,road:null,along:0};
+function hav(a,b,c,d){
+ const R=6371000,M=Math.PI/180;
+ const dLat=(c-a)*M,dLng=(d-b)*M;
+ return 2*R*Math.asin(Math.sqrt(Math.sin(dLat/2)**2+Math.cos(a*M)*Math.cos(c*M)*Math.sin(dLng/2)**2));
+}
+
+function findRoad(lat,lng){
+ let best=null;
  ROADS.forEach(r=>{
-  let acc=0;
-  for(let i=0;i<r.polyline.length-1;i++){
-   const a=r.polyline[i],b=r.polyline[i+1];
-   const d1=hav(lat,lng,a[1],a[0]);
-   const d2=hav(lat,lng,b[1],b[0]);
-   const d=Math.min(d1,d2);
-   if(d<best.dist){
-    best={dist:d,road:r,along:acc};
-   }
-   acc+=hav(a[1],a[0],b[1],b[0]);
-  }
+  let acc=r.sta_start||0;
+  r.polyline.forEach((p,i)=>{
+   if(i===0)return;
+   let d=hav(lat,lng,p[1],p[0]);
+   if(!best||d<best.d) best={r,sta:acc,d};
+   acc+=hav(r.polyline[i-1][1],r.polyline[i-1][0],p[1],p[0]);
+  });
  });
  return best;
 }
 
-function refreshLive(){
- navigator.geolocation.getCurrentPosition(p=>{
-  const f=findNearest(p.coords.latitude,p.coords.longitude);
-  if(liveMarker)map.removeLayer(liveMarker);
-  liveMarker=L.circleMarker([p.coords.latitude,p.coords.longitude],
-   {radius:8,color:"#1565C0",fillColor:"#42A5F5",fillOpacity:.8}
-  ).addTo(map);
-  map.setView([p.coords.latitude,p.coords.longitude],17);
+function formatSTA(m){return `STA ${Math.floor(m/1000)}+${String(Math.round(m%1000)).padStart(3,"0")}`}
 
-  if(f.dist>100){
-   toast("⚠️ Lokasi berada di luar ruas jalan (>100 m)");
-   liveRuas.textContent="-"; liveSTA.textContent="-";
-  }else{
-   liveRuas.textContent=f.road.name;
-   liveSTA.textContent=sta(f.road.sta_start+f.along);
+function refreshLocation(){
+ navigator.geolocation.getCurrentPosition(p=>{
+  let n=findRoad(p.coords.latitude,p.coords.longitude);
+  let txt="-";
+  if(n){
+   txt=`${n.r.name}<br>${formatSTA(n.sta)}`;
+   if(n.d>100) toast("⚠ Lokasi di luar ruas (>100 m)");
   }
+  document.getElementById("currentInfo").innerHTML="<b>Lokasi Saat Ini</b><br>"+txt;
+  if(liveMarker) map.removeLayer(liveMarker);
+  liveMarker=L.circleMarker([p.coords.latitude,p.coords.longitude],{radius:8,color:"blue"}).addTo(map);
+  map.setView([p.coords.latitude,p.coords.longitude],16);
  });
 }
 
 function savePoint(type){
  navigator.geolocation.getCurrentPosition(p=>{
-  const f=findNearest(p.coords.latitude,p.coords.longitude);
-  let ruas="-",staVal="-",luar=true;
-
-  if(f.dist<=100){
-   ruas=f.road.name;
-   staVal=sta(f.road.sta_start+f.along);
-   luar=false;
-  }else{
-   toast("⚠️ Lokasi berada di luar ruas jalan (>100 m)");
-  }
-
-  const e={
+  let n=findRoad(p.coords.latitude,p.coords.longitude);
+  let entry={
    id:Date.now(),type,
    lat:p.coords.latitude,lng:p.coords.longitude,
-   time:timeWITA(),
-   ruas,sta:staVal,luar_ruas:luar,
-   gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
+   time:new Date().toLocaleString("id-ID",{timeZone:"Asia/Makassar"}),
+   gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`,
+   ruas:n?n.r.name:"-",sta:n?formatSTA(n.sta):"-"
   };
-  data.push(e);
+  if(n&&n.d>100) toast("⚠ Lokasi di luar ruas (>100 m)");
+  data.push(entry);
   localStorage.setItem("jalan_data",JSON.stringify(data));
-  render();updateMap();buildSummary();
-  lastInfo.innerHTML=`<b>Data Terakhir</b><br>${e.type}<br>${e.time}`;
+  document.getElementById("lastInfo").innerHTML=`<b>Data Terakhir</b><br>${entry.type}<br>${entry.ruas}<br>${entry.sta}`;
+  render(); buildSummary();
  });
-}
-
-function buildSummary(){
- const jenis=["Lubang","Retak Buaya","Jembul","Amblas","Rumput Tinggi","Lainnya"];
- let m={};
-
- data.forEach(d=>{
-  const r=d.ruas||"-";
-  if(!m[r]){m[r]={Total:0};jenis.forEach(j=>m[r][j]=0);}
-  m[r].Total++;
-  (m[r][jenis.includes(d.type)?d.type:"Lainnya"])++;
- });
-
- let h="<table><tr><th>Ruas</th><th>Total</th>";
- jenis.forEach(j=>h+=`<th>${j}</th>`); h+="</tr>";
-
- Object.keys(m).forEach(r=>{
-  h+=`<tr><td>${r}</td><td>${m[r].Total}</td>`;
-  jenis.forEach(j=>h+=`<td>${m[r][j]}</td>`);
-  h+="</tr>";
- });
- summaryWrap.innerHTML=h;
-}
-
-function toggleSummary(){
- summaryWrap.style.display=summaryWrap.style.display==="none"?"block":"none";
- buildSummary();
 }
 
 function render(){
- if(!data.length){dataTable.innerHTML="<tr><td>Belum ada data</td></tr>";return;}
- let h="<tr><th>Jenis</th><th>Ruas</th><th>STA</th><th>Aksi</th></tr>";
- data.forEach(d=>h+=`
- <tr>
-  <td>${d.type}</td><td>${d.ruas}</td><td>${d.sta}</td>
-  <td>
-   <button class="action-btn edit-btn" onclick="editItem(${d.id})">EDIT</button>
-   <button class="action-btn gmap-btn" onclick="window.open('${d.gmaps}')">GMAP</button>
-   <button class="action-btn del-btn" onclick="delItem(${d.id})">HAPUS</button>
-  </td>
- </tr>`);
- dataTable.innerHTML=h;
+ markers.forEach(m=>map.removeLayer(m));markers=[];
+ let t=document.getElementById("dataTable");
+ if(!data.length){t.innerHTML="<tr><td>Belum ada data</td></tr>";return}
+ t.innerHTML="<tr><th>Jenis</th><th>Ruas</th><th>STA</th><th>Waktu</th><th>Aksi</th></tr>";
+ data.forEach(d=>{
+  let m=L.marker([d.lat,d.lng]).addTo(map);
+  markers.push(m);
+  t.innerHTML+=`<tr>
+<td>${d.type}</td><td>${d.ruas}</td><td>${d.sta}</td><td>${d.time}</td>
+<td>
+<button class="small-btn edit-btn" onclick="edit(${d.id})">Edit</button>
+<button class="small-btn gmaps-btn" onclick="window.open('${d.gmaps}')">Gmaps</button>
+<button class="small-btn delete-btn" onclick="del(${d.id})">Hapus</button>
+</td></tr>`;
+ });
+ map.fitBounds(L.featureGroup(markers).getBounds().pad(0.3));
 }
 
-function editItem(id){
- const d=data.find(x=>x.id===id);
- const v=prompt("Ubah jenis:",d.type);
- if(v){d.type=v;localStorage.setItem("jalan_data",JSON.stringify(data));render();buildSummary();}
-}
-function delItem(id){
- if(confirm("Hapus data?")){
-  data=data.filter(d=>d.id!==id);
-  localStorage.setItem("jalan_data",JSON.stringify(data));
-  render();updateMap();buildSummary();
- }
-}
-function toggleTable(){tableWrap.style.display=tableWrap.style.display==="none"?"block":"none";}
+function edit(id){let i=data.find(x=>x.id===id);let t=prompt("Edit:",i.type);if(t){i.type=t;save()}}
+function del(id){if(confirm("Hapus?")){data=data.filter(x=>x.id!==id);save()}}
+function save(){localStorage.setItem("jalan_data",JSON.stringify(data));render();buildSummary()}
+
 function exportCSV(){
- let c="jenis,ruas,sta,luar_ruas,lat,lng,waktu,gmaps\n";
- data.forEach(d=>c+=`${d.type},${d.ruas},${d.sta},${d.luar_ruas},${d.lat},${d.lng},${d.time},${d.gmaps}\n`);
- download(c,"kerusakan_jalan.csv");
+ let c="Jenis,Ruas,STA,Lat,Lng,Waktu,Maps\n";
+ data.forEach(d=>c+=`${d.type},${d.ruas},${d.sta},${d.lat},${d.lng},"${d.time}",${d.gmaps}\n`);
+ download(c,"kerusakan.csv");
 }
 function exportTXT(){
  let t="";
  data.forEach(d=>{
-  t+=`Jenis Kerusakan : ${d.type}\n`;
-  t+=`Ruas+STA       : ${d.ruas} | ${d.sta}\n`;
-  t+=`Google Maps    : ${d.gmaps}\n`;
-  t+=`Tanggal        : ${d.time}\n`;
-  t+=`----------------------------\n`;
+ t+=`Jenis Kerusakan : ${d.type}\nRuas+STA : ${d.ruas} ${d.sta}\nGoogle Maps : ${d.gmaps}\nTanggal : ${d.time} WITA\n\n`;
  });
- download(t,"kerusakan_jalan.txt");
+ download(t,"kerusakan.txt");
 }
-function download(c,f){
- const a=document.createElement("a");
- a.href=URL.createObjectURL(new Blob([c]));
- a.download=f;a.click();
+function download(c,n){let b=new Blob([c]);let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=n;a.click()}
+
+function toggleTable(){let x=document.getElementById("tableBox");x.style.display=x.style.display?"":"block"}
+function toggleSummary(){let x=document.getElementById("summaryBox");x.style.display=x.style.display?"":"block"}
+
+function buildSummary(){
+ let s={};
+ data.forEach(d=>{
+  s[d.ruas]=s[d.ruas]||{Total:0};
+  s[d.ruas].Total++;
+  s[d.ruas][d.type]=(s[d.ruas][d.type]||0)+1;
+ });
+ let h="<table><tr><th>Ruas</th><th>Total</th><th>Lubang</th><th>Retak Buaya</th><th>Jembul</th><th>Amblas</th><th>Rumput Tinggi</th><th>Lainnya</th></tr>";
+ Object.keys(s).forEach(r=>{
+  let o=s[r];
+  h+=`<tr><td>${r}</td><td>${o.Total||0}</td>
+<td>${o["Lubang"]||0}</td>
+<td>${o["Retak Buaya"]||0}</td>
+<td>${o["Jembul"]||0}</td>
+<td>${o["Amblas"]||0}</td>
+<td>${o["Rumput Tinggi"]||0}</td>
+<td>${(o.Total||0)-(o["Lubang"]||0)-(o["Retak Buaya"]||0)-(o["Jembul"]||0)-(o["Amblas"]||0)-(o["Rumput Tinggi"]||0)}</td></tr>`;
+ });
+ document.getElementById("summaryBox").innerHTML=h+"</table>";
 }
 
-const map=L.map("map").setView([0,0],2);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-let markers=[];
-function updateMap(){
- markers.forEach(m=>map.removeLayer(m));markers=[];
- data.forEach(d=>markers.push(L.marker([d.lat,d.lng]).addTo(map)));
- if(markers.length)map.fitBounds(L.featureGroup(markers).getBounds().pad(.3));
+function clearAll(){
+ if(!confirm("Hapus semua data?"))return;
+ data=[];localStorage.removeItem("jalan_data");
+ render();buildSummary();
+ document.getElementById("lastInfo").innerHTML="<b>Data Terakhir</b><br>-";
+ toast("Semua data dihapus");
 }
-render();updateMap();
+
+render();buildSummary();
 </script>
 </body>
 </html>
