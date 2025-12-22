@@ -43,9 +43,10 @@ background:#333;color:white;padding:8px;border-radius:6px;opacity:0;transition:.
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+ <button style="background:#455A64" onclick="toggleSummary()">Ringkasan Ruas</button>
  <button style="background:#607D8B" onclick="exportCSV()">Export CSV</button>
  <button style="background:#795548" onclick="exportTXT()">Export TXT</button>
- <button style="background:#009688" onclick="toggleTable()">Tabel</button>
+ <button style="background:#009688" onclick="toggleTable()">Data</button>
  <button style="background:#f44336" onclick="resetAll()">Reset</button>
 </div>
 
@@ -63,6 +64,8 @@ background:#333;color:white;padding:8px;border-radius:6px;opacity:0;transition:.
  </div>
 </div>
 
+<div id="summaryWrap" style="display:none"></div>
+
 <div id="tableWrap" style="display:none">
  <table id="dataTable"></table>
 </div>
@@ -73,16 +76,19 @@ background:#333;color:white;padding:8px;border-radius:6px;opacity:0;transition:.
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-let ROADS=[],data=JSON.parse(localStorage.getItem("jalan_data"))||[],lastLive=null;
+let ROADS=[],data=JSON.parse(localStorage.getItem("jalan_data"))||[];
+let liveMarker=null;
+
 fetch("roads.json").then(r=>r.json()).then(j=>ROADS=j);
 
 const R=6371000,d=Math.PI/180;
-const hav=(a,b,c,e)=>2*R*Math.atan2(Math.sqrt(Math.sin((c-a)*d/2)**2+
-Math.cos(a*d)*Math.cos(c*d)*Math.sin((e-b)*d/2)**2),
-Math.sqrt(1-(Math.sin((c-a)*d/2)**2+
-Math.cos(a*d)*Math.cos(c*d)*Math.sin((e-b)*d/2)**2)));
+function hav(a,b,c,e){
+ const x=Math.sin((c-a)*d/2)**2+
+ Math.cos(a*d)*Math.cos(c*d)*Math.sin((e-b)*d/2)**2;
+ return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
 const sta=m=>`STA ${Math.floor(m/1000)}+${String(Math.round(m%1000)).padStart(3,"0")}`;
-const toast=m=>{const t=document.getElementById("toast");t.textContent=m;t.className="show";setTimeout(()=>t.className="",2500);}
+const toast=m=>{const t=document.getElementById("toast");t.textContent=m;t.className="show";setTimeout(()=>t.className="",3000);}
 const timeWITA=()=>new Date().toLocaleString("id-ID",{timeZone:"Asia/Makassar"})+" WITA";
 
 function findRoad(lat,lng){
@@ -103,40 +109,52 @@ function findRoad(lat,lng){
 function refreshLive(){
  navigator.geolocation.getCurrentPosition(p=>{
   const f=findRoad(p.coords.latitude,p.coords.longitude);
-  if(f && f.dist<=100){
-   document.getElementById("liveRuas").textContent=f.r.name;
-   document.getElementById("liveSTA").textContent=sta(f.r.sta_start+f.along);
-   lastLive={ruas:f.r.name,sta:sta(f.r.sta_start+f.along)};
-  }else{
-   toast("⚠️ Lokasi di luar ruas");
-   lastLive=null;
+  if(liveMarker){map.removeLayer(liveMarker);}
+  liveMarker=L.circleMarker([p.coords.latitude,p.coords.longitude],{
+    radius:8,color:"#1565C0",fillColor:"#42A5F5",fillOpacity:0.8
+  }).addTo(map);
+  map.setView([p.coords.latitude,p.coords.longitude],17);
+
+  if(!f||f.dist>100){
+   toast("⚠️ Lokasi di luar ruas jalan");
+   liveRuas.textContent="-"; liveSTA.textContent="-";
+   return;
   }
+  liveRuas.textContent=f.r.name;
+  liveSTA.textContent=sta(f.r.sta_start+f.along);
  },e=>alert(e.message),{enableHighAccuracy:true});
 }
 
 function savePoint(type){
  navigator.geolocation.getCurrentPosition(p=>{
+  const f=findRoad(p.coords.latitude,p.coords.longitude);
+  let ruas="-",staVal="-",luar=true;
+
+  if(f && f.dist<=100){
+   ruas=f.r.name;
+   staVal=sta(f.r.sta_start+f.along);
+   luar=false;
+  } else {
+   toast("⚠️ Lokasi berada di luar ruas jalan (>100 m)");
+  }
+
   const e={
-   id:Date.now(),
-   type,
-   lat:p.coords.latitude,
-   lng:p.coords.longitude,
-   acc:p.coords.accuracy,
-   time:timeWITA(),
-   ruas:lastLive?lastLive.ruas:"-",
-   sta:lastLive?lastLive.sta:"-",
+   id:Date.now(),type,
+   lat:p.coords.latitude,lng:p.coords.longitude,
+   acc:p.coords.accuracy,time:timeWITA(),
+   ruas,sta:staVal,luar_ruas:luar,
    gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
   };
-  data.push(e);save();render();updateMap();
-  document.getElementById("lastInfo").innerHTML=
-   `<b>Data Terakhir</b><br>Jenis: ${e.type}<br>Waktu: ${e.time}`;
+
+  data.push(e); save(); render(); updateMap();
+  lastInfo.innerHTML=`<b>Data Terakhir</b><br>Jenis: ${e.type}<br>Waktu: ${e.time}`;
  },e=>alert(e.message),{enableHighAccuracy:true});
 }
 
 function save(){localStorage.setItem("jalan_data",JSON.stringify(data));}
 
 function render(){
- const t=document.getElementById("dataTable");
+ const t=dataTable;
  if(!data.length){t.innerHTML="<tr><td>Belum ada data</td></tr>";return;}
  let h="<tr><th>Jenis</th><th>Ruas</th><th>STA</th><th>Aksi</th></tr>";
  data.forEach(d=>h+=`
@@ -153,26 +171,49 @@ function render(){
  t.innerHTML=h;
 }
 
+function buildSummary(){
+ let map={};
+ data.forEach(d=>{
+  const k=d.ruas||"-";
+  if(!map[k]) map[k]={total:0,jenis:{}};
+  map[k].total++;
+  map[k].jenis[d.type]=(map[k].jenis[d.type]||0)+1;
+ });
+
+ let h="<table><tr><th>Ruas</th><th>Total</th><th>Detail</th></tr>";
+ Object.keys(map).forEach(r=>{
+  let det="";
+  Object.keys(map[r].jenis).forEach(j=>{
+   det+=`${j}:${map[r].jenis[j]} `;
+  });
+  h+=`<tr><td>${r}</td><td>${map[r].total}</td><td>${det}</td></tr>`;
+ });
+ h+="</table>";
+ summaryWrap.innerHTML=h;
+}
+
+function toggleSummary(){
+ summaryWrap.style.display=summaryWrap.style.display==="none"?"block":"none";
+ buildSummary();
+}
+
 function editItem(id){
  const d=data.find(x=>x.id===id);
  const v=prompt("Ubah jenis kerusakan:",d.type);
- if(v){d.type=v;save();render();}
+ if(v){d.type=v;save();render();buildSummary();}
 }
 function delItem(id){
  if(confirm("Hapus data ini?")){
-  data=data.filter(d=>d.id!==id);save();render();updateMap();
+  data=data.filter(d=>d.id!==id);save();render();updateMap();buildSummary();
  }
 }
-function openGmap(url){
- window.open(url,"_blank","noopener");
-}
+function openGmap(url){window.open(url,"_blank","noopener");}
 
 function exportCSV(){
- let c="jenis,ruas,sta,lat,lng,akurasi,waktu,gmaps\n";
- data.forEach(d=>c+=`${d.type},${d.ruas},${d.sta},${d.lat},${d.lng},${d.acc},${d.time},${d.gmaps}\n`);
+ let c="jenis,ruas,sta,luar_ruas,lat,lng,akurasi,waktu,gmaps\n";
+ data.forEach(d=>c+=`${d.type},${d.ruas},${d.sta},${d.luar_ruas},${d.lat},${d.lng},${d.acc},${d.time},${d.gmaps}\n`);
  download(c,"kerusakan_jalan.csv");
 }
-
 function exportTXT(){
  let t="";
  data.forEach(d=>{
@@ -184,23 +225,15 @@ function exportTXT(){
  });
  download(t,"kerusakan_jalan.txt");
 }
-
 function download(c,f){
  const a=document.createElement("a");
  a.href=URL.createObjectURL(new Blob([c]));
  a.download=f;a.click();
 }
 
-function toggleTable(){
- tableWrap.style.display=tableWrap.style.display==="none"?"block":"none";
-}
-function resetAll(){
- if(confirm("Hapus semua data?")){data=[];save();render();updateMap();}
-}
-function customType(){
- const x=prompt("Jenis kerusakan lain:");
- if(x)savePoint(x);
-}
+function toggleTable(){tableWrap.style.display=tableWrap.style.display==="none"?"block":"none";}
+function resetAll(){if(confirm("Hapus semua data?")){data=[];save();render();updateMap();}}
+function customType(){const x=prompt("Jenis kerusakan lain:");if(x)savePoint(x);}
 
 const map=L.map("map").setView([0,0],2);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
@@ -213,6 +246,5 @@ function updateMap(){
 
 render();updateMap();
 </script>
-
 </body>
 </html>
