@@ -23,7 +23,7 @@ th{background:#eee}
 .flex2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px}
 .box{background:#fff;padding:6px;border-radius:8px;font-size:12px}
 #toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
-background:#333;color:#fff;padding:8px;border-radius:6px;display:none}
+background:#333;color:#fff;padding:8px;border-radius:6px;display:none;z-index:999}
 </style>
 </head>
 
@@ -54,7 +54,6 @@ background:#333;color:#fff;padding:8px;border-radius:6px;display:none}
 </div>
 
 <div id="summaryBox" style="display:none" class="box"></div>
-
 <div id="tableBox" style="display:none" class="box">
 <table id="dataTable"></table>
 </div>
@@ -69,39 +68,59 @@ let map=L.map("map").setView([-8.5,115.2],10);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
 let markers=[],liveMarker=null;
 
+// ================= LOAD ROADS =================
 fetch("roads.json").then(r=>r.json()).then(j=>ROADS=j);
 
-function toast(t){let x=document.getElementById("toast");x.innerText=t;x.style.display="block";setTimeout(()=>x.style.display="none",2500)}
-
+// ================= UTIL =================
+function toast(t){
+ let x=document.getElementById("toast");
+ x.innerText=t;x.style.display="block";
+ setTimeout(()=>x.style.display="none",3000);
+}
 function hav(a,b,c,d){
  const R=6371000,M=Math.PI/180;
  const dLat=(c-a)*M,dLng=(d-b)*M;
- return 2*R*Math.asin(Math.sqrt(Math.sin(dLat/2)**2+Math.cos(a*M)*Math.cos(c*M)*Math.sin(dLng/2)**2));
+ return 2*R*Math.asin(Math.sqrt(
+  Math.sin(dLat/2)**2+
+  Math.cos(a*M)*Math.cos(c*M)*Math.sin(dLng/2)**2));
 }
+function distancePointToSegment(lat,lng,lat1,lng1,lat2,lng2){
+ const toRad=x=>x*Math.PI/180;
+ const φ=toRad(lat),λ=toRad(lng);
+ const φ1=toRad(lat1),λ1=toRad(lng1);
+ const φ2=toRad(lat2),λ2=toRad(lng2);
+ const x=(λ2-λ1)*Math.cos((φ1+φ2)/2);
+ const y=(φ2-φ1);
+ const u=((λ-λ1)*Math.cos((φ1+φ)/2)*x+(φ-φ1)*y)/(x*x+y*y);
+ if(u<0) return hav(lat,lng,lat1,lng1);
+ if(u>1) return hav(lat,lng,lat2,lng2);
+ return hav(lat,lng,lat1+u*(lat2-lat1),lng1+u*(lng2-lng1));
+}
+function formatSTA(m){return `STA ${Math.floor(m/1000)}+${String(Math.round(m%1000)).padStart(3,"0")}`}
 
+// ================= CORE =================
 function findRoad(lat,lng){
  let best=null;
  ROADS.forEach(r=>{
-  let acc=r.sta_start||0;
-  r.polyline.forEach((p,i)=>{
-   if(i===0)return;
-   let d=hav(lat,lng,p[1],p[0]);
-   if(!best||d<best.d) best={r,sta:acc,d};
-   acc+=hav(r.polyline[i-1][1],r.polyline[i-1][0],p[1],p[0]);
-  });
+  let sta=r.sta_start||0;
+  for(let i=1;i<r.polyline.length;i++){
+   let p1=r.polyline[i-1],p2=r.polyline[i];
+   let d=distancePointToSegment(lat,lng,p1[1],p1[0],p2[1],p2[0]);
+   if(!best||d<best.d) best={r,sta,d};
+   sta+=hav(p1[1],p1[0],p2[1],p2[0]);
+  }
  });
  return best;
 }
 
-function formatSTA(m){return `STA ${Math.floor(m/1000)}+${String(Math.round(m%1000)).padStart(3,"0")}`}
-
+// ================= LOCATION =================
 function refreshLocation(){
  navigator.geolocation.getCurrentPosition(p=>{
   let n=findRoad(p.coords.latitude,p.coords.longitude);
   let txt="-";
   if(n){
    txt=`${n.r.name}<br>${formatSTA(n.sta)}`;
-   if(n.d>100) toast("⚠ Lokasi di luar ruas (>100 m)");
+   if(n.d>100) toast("⚠ Lokasi berada di luar ruas jalan (>100 m)");
   }
   document.getElementById("currentInfo").innerHTML="<b>Lokasi Saat Ini</b><br>"+txt;
   if(liveMarker) map.removeLayer(liveMarker);
@@ -113,29 +132,30 @@ function refreshLocation(){
 function savePoint(type){
  navigator.geolocation.getCurrentPosition(p=>{
   let n=findRoad(p.coords.latitude,p.coords.longitude);
-  let entry={
+  if(n&&n.d>100) toast("⚠ Lokasi berada di luar ruas jalan (>100 m)");
+  let e={
    id:Date.now(),type,
    lat:p.coords.latitude,lng:p.coords.longitude,
    time:new Date().toLocaleString("id-ID",{timeZone:"Asia/Makassar"}),
    gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`,
    ruas:n?n.r.name:"-",sta:n?formatSTA(n.sta):"-"
   };
-  if(n&&n.d>100) toast("⚠ Lokasi di luar ruas (>100 m)");
-  data.push(entry);
+  data.push(e);
   localStorage.setItem("jalan_data",JSON.stringify(data));
-  document.getElementById("lastInfo").innerHTML=`<b>Data Terakhir</b><br>${entry.type}<br>${entry.ruas}<br>${entry.sta}`;
-  render(); buildSummary();
+  document.getElementById("lastInfo").innerHTML=
+   `<b>Data Terakhir</b><br>${e.type}<br>${e.ruas}<br>${e.sta}`;
+  render();buildSummary();
  });
 }
 
+// ================= UI =================
 function render(){
  markers.forEach(m=>map.removeLayer(m));markers=[];
  let t=document.getElementById("dataTable");
  if(!data.length){t.innerHTML="<tr><td>Belum ada data</td></tr>";return}
  t.innerHTML="<tr><th>Jenis</th><th>Ruas</th><th>STA</th><th>Waktu</th><th>Aksi</th></tr>";
  data.forEach(d=>{
-  let m=L.marker([d.lat,d.lng]).addTo(map);
-  markers.push(m);
+  markers.push(L.marker([d.lat,d.lng]).addTo(map));
   t.innerHTML+=`<tr>
 <td>${d.type}</td><td>${d.ruas}</td><td>${d.sta}</td><td>${d.time}</td>
 <td>
