@@ -19,7 +19,10 @@ button{padding:14px;font-size:16px;border-radius:10px;border:none;color:white;cu
 table{width:100%;border-collapse:collapse;font-size:12px;background:white}
 th,td{border:1px solid #bbb;padding:6px}
 th{background:#eee}
-.action-btn{font-size:11px;padding:4px 6px;margin:1px;border-radius:5px;border:none;cursor:pointer}
+.action-btn{font-size:11px;padding:5px 7px;margin:1px;border-radius:5px;border:none;cursor:pointer}
+.edit-btn{background:#1E88E5;color:white}
+.gmap-btn{background:#FB8C00;color:white}
+.del-btn{background:#E53935;color:white}
 #toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
 background:#333;color:white;padding:8px;border-radius:6px;opacity:0;transition:.3s}
 #toast.show{opacity:1}
@@ -56,8 +59,7 @@ background:#333;color:white;padding:8px;border-radius:6px;opacity:0;transition:.
  <div class="info-box" id="lastInfo">
   <b>Data Terakhir</b><br>
   Jenis: -<br>
-  Waktu: -<br>
-  Akurasi: -
+  Waktu: -
  </div>
 </div>
 
@@ -81,7 +83,7 @@ Math.sqrt(1-(Math.sin((c-a)*d/2)**2+
 Math.cos(a*d)*Math.cos(c*d)*Math.sin((e-b)*d/2)**2)));
 const sta=m=>`STA ${Math.floor(m/1000)}+${String(Math.round(m%1000)).padStart(3,"0")}`;
 const toast=m=>{const t=document.getElementById("toast");t.textContent=m;t.className="show";setTimeout(()=>t.className="",2500);}
-const time=()=>new Date().toLocaleString("id-ID",{timeZone:"Asia/Makassar"});
+const timeWITA=()=>new Date().toLocaleString("id-ID",{timeZone:"Asia/Makassar"})+" WITA";
 
 function findRoad(lat,lng){
  let best=null;
@@ -114,13 +116,20 @@ function refreshLive(){
 
 function savePoint(type){
  navigator.geolocation.getCurrentPosition(p=>{
-  const e={id:Date.now(),type,lat:p.coords.latitude,lng:p.coords.longitude,
-   acc:p.coords.accuracy,time:time(),
-   ruas:lastLive?lastLive.ruas:"-",sta:lastLive?lastLive.sta:"-",
-   gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`};
+  const e={
+   id:Date.now(),
+   type,
+   lat:p.coords.latitude,
+   lng:p.coords.longitude,
+   acc:p.coords.accuracy,
+   time:timeWITA(),
+   ruas:lastLive?lastLive.ruas:"-",
+   sta:lastLive?lastLive.sta:"-",
+   gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
+  };
   data.push(e);save();render();updateMap();
   document.getElementById("lastInfo").innerHTML=
-   `<b>Data Terakhir</b><br>Jenis: ${e.type}<br>Waktu: ${e.time}<br>Akurasi: ${e.acc} m`;
+   `<b>Data Terakhir</b><br>Jenis: ${e.type}<br>Waktu: ${e.time}`;
  },e=>alert(e.message),{enableHighAccuracy:true});
 }
 
@@ -136,40 +145,52 @@ function render(){
   <td>${d.ruas}</td>
   <td><b>${d.sta}</b></td>
   <td>
-   <button class="action-btn" onclick="edit(${d.id})">EDIT</button>
-   <button class="action-btn" onclick="open('${d.gmaps}')">GMAP</button>
-   <button class="action-btn" style="background:#e53935;color:white" onclick="del(${d.id})">HAPUS</button>
+   <button class="action-btn edit-btn" onclick="editItem(${d.id})">EDIT</button>
+   <button class="action-btn gmap-btn" onclick="openGmap('${d.gmaps}')">GMAP</button>
+   <button class="action-btn del-btn" onclick="delItem(${d.id})">HAPUS</button>
   </td>
  </tr>`);
  t.innerHTML=h;
 }
 
-function edit(id){
+function editItem(id){
  const d=data.find(x=>x.id===id);
- const v=prompt("Ubah jenis:",d.type);
+ const v=prompt("Ubah jenis kerusakan:",d.type);
  if(v){d.type=v;save();render();}
 }
-function del(id){
+function delItem(id){
  if(confirm("Hapus data ini?")){
   data=data.filter(d=>d.id!==id);save();render();updateMap();
  }
 }
-function open(u){window.open(u,"_blank");}
+function openGmap(url){
+ window.open(url,"_blank","noopener");
+}
 
 function exportCSV(){
  let c="jenis,ruas,sta,lat,lng,akurasi,waktu,gmaps\n";
  data.forEach(d=>c+=`${d.type},${d.ruas},${d.sta},${d.lat},${d.lng},${d.acc},${d.time},${d.gmaps}\n`);
- const a=document.createElement("a");
- a.href=URL.createObjectURL(new Blob([c]));
- a.download="kerusakan_jalan.csv";a.click();
+ download(c,"kerusakan_jalan.csv");
 }
+
 function exportTXT(){
  let t="";
- data.forEach(d=>t+=`${d.time} | ${d.type} | ${d.ruas} | ${d.sta}\n`);
- const a=document.createElement("a");
- a.href=URL.createObjectURL(new Blob([t]));
- a.download="kerusakan_jalan.txt";a.click();
+ data.forEach(d=>{
+  t+=`Jenis Kerusakan : ${d.type}\n`;
+  t+=`Ruas+STA       : ${d.ruas} | ${d.sta}\n`;
+  t+=`Google Maps    : ${d.gmaps}\n`;
+  t+=`Tanggal        : ${d.time}\n`;
+  t+=`----------------------------------------\n`;
+ });
+ download(t,"kerusakan_jalan.txt");
 }
+
+function download(c,f){
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob([c]));
+ a.download=f;a.click();
+}
+
 function toggleTable(){
  tableWrap.style.display=tableWrap.style.display==="none"?"block":"none";
 }
