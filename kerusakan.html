@@ -1,28 +1,28 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pencatat Kerusakan Jalan - PJN 1 Bali</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <style>
-body{font-family:Arial;margin:0;background:#f9f9f9;text-align:center}
+body{font-family:Arial;margin:0;background:#f7f7f7;text-align:center}
 h2{margin:10px 0;font-size:18px}
 .btn-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:10px}
 button{padding:14px;font-size:16px;border-radius:10px;border:none;color:white;cursor:pointer}
+.small-btn{font-size:12px;padding:4px 6px;border-radius:6px}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 10px}
-.info-box{background:white;border-radius:8px;padding:8px;font-size:13px;text-align:left;box-shadow:0 0 4px rgba(0,0,0,0.1)}
-.info-box b{color:#333}
-.small-btn{font-size:12px;padding:4px 6px;border-radius:5px}
+.info-box{background:white;border-radius:8px;padding:8px;font-size:13px;text-align:left;box-shadow:0 0 4px rgba(0,0,0,.15)}
 #map{height:50vh}
-#toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
-background:#333;color:white;padding:10px;border-radius:6px;opacity:0;transition:.4s}
-#toast.show{opacity:1;bottom:50px}
 table{width:100%;border-collapse:collapse;font-size:12px;background:white}
 th,td{border:1px solid #bbb;padding:6px}
 th{background:#eee}
+.action-btn{font-size:11px;padding:4px 6px;margin:1px;border-radius:5px;border:none;cursor:pointer}
+#toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+background:#333;color:white;padding:8px;border-radius:6px;opacity:0;transition:.3s}
+#toast.show{opacity:1}
 </style>
 </head>
 
@@ -31,19 +31,19 @@ th{background:#eee}
 <h2>Pencatat Kerusakan Jalan - PJN 1 Bali</h2>
 
 <div class="btn-grid">
- <button id="btnLubang" style="background:#FF8A65">Lubang</button>
- <button id="btnRetak" style="background:#4DB6AC">Retak Buaya</button>
- <button id="btnRumput" style="background:#AED581;color:#333">Rumput Tinggi</button>
- <button id="btnJembul" style="background:#BA68C8">Jembul</button>
- <button id="btnAmblas" style="background:#FFD54F;color:#333">Amblas</button>
- <button id="btnLain" style="background:#90A4AE">Lain...</button>
+ <button style="background:#FF8A65" onclick="savePoint('Lubang')">Lubang</button>
+ <button style="background:#4DB6AC" onclick="savePoint('Retak Buaya')">Retak Buaya</button>
+ <button style="background:#AED581;color:#333" onclick="savePoint('Rumput Tinggi')">Rumput Tinggi</button>
+ <button style="background:#BA68C8" onclick="savePoint('Jembul')">Jembul</button>
+ <button style="background:#FFD54F;color:#333" onclick="savePoint('Amblas')">Amblas</button>
+ <button style="background:#90A4AE" onclick="customType()">Lain...</button>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
- <button id="btnCSV" style="background:#607D8B">Export CSV</button>
- <button id="btnTXT" style="background:#795548">Export TXT</button>
- <button id="btnToggle" style="background:#009688">Data Tersimpan</button>
- <button id="btnClear" style="background:#f44336">Reset Data</button>
+ <button style="background:#607D8B" onclick="exportCSV()">Export CSV</button>
+ <button style="background:#795548" onclick="exportTXT()">Export TXT</button>
+ <button style="background:#009688" onclick="toggleTable()">Tabel</button>
+ <button style="background:#f44336" onclick="resetAll()">Reset</button>
 </div>
 
 <div class="info-grid">
@@ -53,7 +53,7 @@ th{background:#eee}
   STA: <span id="liveSTA">-</span><br><br>
   <button class="small-btn" style="background:#03A9F4;color:white" onclick="refreshLive()">🔄 Refresh Lokasi</button>
  </div>
- <div class="info-box" id="infoLast">
+ <div class="info-box" id="lastInfo">
   <b>Data Terakhir</b><br>
   Jenis: -<br>
   Waktu: -<br>
@@ -61,9 +61,7 @@ th{background:#eee}
  </div>
 </div>
 
-<div id="status">Menunggu aksi...</div>
-
-<div id="tableContainer" style="display:none">
+<div id="tableWrap" style="display:none">
  <table id="dataTable"></table>
 </div>
 
@@ -73,19 +71,17 @@ th{background:#eee}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-// ===== LOAD ROADS =====
-let ROADS=[];
+let ROADS=[],data=JSON.parse(localStorage.getItem("jalan_data"))||[],lastLive=null;
 fetch("roads.json").then(r=>r.json()).then(j=>ROADS=j);
 
-// ===== UTILS =====
 const R=6371000,d=Math.PI/180;
 const hav=(a,b,c,e)=>2*R*Math.atan2(Math.sqrt(Math.sin((c-a)*d/2)**2+
 Math.cos(a*d)*Math.cos(c*d)*Math.sin((e-b)*d/2)**2),
 Math.sqrt(1-(Math.sin((c-a)*d/2)**2+
 Math.cos(a*d)*Math.cos(c*d)*Math.sin((e-b)*d/2)**2)));
 const sta=m=>`STA ${Math.floor(m/1000)}+${String(Math.round(m%1000)).padStart(3,"0")}`;
-const toast=m=>{const t=document.getElementById("toast");t.textContent=m;t.className="show";setTimeout(()=>t.className="",3000);}
-const wita=()=>new Date().toLocaleString("id-ID",{timeZone:"Asia/Makassar"});
+const toast=m=>{const t=document.getElementById("toast");t.textContent=m;t.className="show";setTimeout(()=>t.className="",2500);}
+const time=()=>new Date().toLocaleString("id-ID",{timeZone:"Asia/Makassar"});
 
 function findRoad(lat,lng){
  let best=null;
@@ -102,60 +98,89 @@ function findRoad(lat,lng){
  return best;
 }
 
-// ===== DATA =====
-let data=JSON.parse(localStorage.getItem("jalan_data"))||[];
-const save=()=>localStorage.setItem("jalan_data",JSON.stringify(data));
-
-// ===== LIVE LOCATION =====
-let lastLive=null;
-
 function refreshLive(){
- navigator.geolocation.getCurrentPosition(pos=>{
-  const f=findRoad(pos.coords.latitude,pos.coords.longitude);
+ navigator.geolocation.getCurrentPosition(p=>{
+  const f=findRoad(p.coords.latitude,p.coords.longitude);
   if(f && f.dist<=100){
    document.getElementById("liveRuas").textContent=f.r.name;
    document.getElementById("liveSTA").textContent=sta(f.r.sta_start+f.along);
    lastLive={ruas:f.r.name,sta:sta(f.r.sta_start+f.along)};
   }else{
-   document.getElementById("liveRuas").textContent="-";
-   document.getElementById("liveSTA").textContent="-";
    toast("⚠️ Lokasi di luar ruas");
    lastLive=null;
   }
- },err=>alert(err.message),{enableHighAccuracy:true});
+ },e=>alert(e.message),{enableHighAccuracy:true});
 }
 
-// ===== SAVE POINT =====
 function savePoint(type){
- navigator.geolocation.getCurrentPosition(pos=>{
-  const e={id:Date.now(),type,lat:pos.coords.latitude,lng:pos.coords.longitude,
-   acc:pos.coords.accuracy,time:wita(),gmaps:`https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`,
-   ruas:lastLive?lastLive.ruas:"-",sta:lastLive?lastLive.sta:"-"};
+ navigator.geolocation.getCurrentPosition(p=>{
+  const e={id:Date.now(),type,lat:p.coords.latitude,lng:p.coords.longitude,
+   acc:p.coords.accuracy,time:time(),
+   ruas:lastLive?lastLive.ruas:"-",sta:lastLive?lastLive.sta:"-",
+   gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`};
   data.push(e);save();render();updateMap();
-  document.getElementById("infoLast").innerHTML=
-   `<b>Data Terakhir</b><br>Jenis: ${type}<br>Waktu: ${e.time}<br>Akurasi: ${e.acc} m`;
- },err=>alert(err.message),{enableHighAccuracy:true});
+  document.getElementById("lastInfo").innerHTML=
+   `<b>Data Terakhir</b><br>Jenis: ${e.type}<br>Waktu: ${e.time}<br>Akurasi: ${e.acc} m`;
+ },e=>alert(e.message),{enableHighAccuracy:true});
 }
 
-// ===== EXPORT CSV =====
-btnCSV.onclick=()=>{
+function save(){localStorage.setItem("jalan_data",JSON.stringify(data));}
+
+function render(){
+ const t=document.getElementById("dataTable");
+ if(!data.length){t.innerHTML="<tr><td>Belum ada data</td></tr>";return;}
+ let h="<tr><th>Jenis</th><th>Ruas</th><th>STA</th><th>Aksi</th></tr>";
+ data.forEach(d=>h+=`
+ <tr>
+  <td>${d.type}</td>
+  <td>${d.ruas}</td>
+  <td><b>${d.sta}</b></td>
+  <td>
+   <button class="action-btn" onclick="edit(${d.id})">EDIT</button>
+   <button class="action-btn" onclick="open('${d.gmaps}')">GMAP</button>
+   <button class="action-btn" style="background:#e53935;color:white" onclick="del(${d.id})">HAPUS</button>
+  </td>
+ </tr>`);
+ t.innerHTML=h;
+}
+
+function edit(id){
+ const d=data.find(x=>x.id===id);
+ const v=prompt("Ubah jenis:",d.type);
+ if(v){d.type=v;save();render();}
+}
+function del(id){
+ if(confirm("Hapus data ini?")){
+  data=data.filter(d=>d.id!==id);save();render();updateMap();
+ }
+}
+function open(u){window.open(u,"_blank");}
+
+function exportCSV(){
  let c="jenis,ruas,sta,lat,lng,akurasi,waktu,gmaps\n";
  data.forEach(d=>c+=`${d.type},${d.ruas},${d.sta},${d.lat},${d.lng},${d.acc},${d.time},${d.gmaps}\n`);
  const a=document.createElement("a");
  a.href=URL.createObjectURL(new Blob([c]));
  a.download="kerusakan_jalan.csv";a.click();
-};
-
-// ===== TABLE & MAP =====
-function render(){
- const t=document.getElementById("dataTable");
- if(!data.length){t.innerHTML="<tr><td>Belum ada data</td></tr>";return;}
- let h="<tr><th>Jenis</th><th>Ruas</th><th>STA</th><th>Lat</th><th>Lng</th><th>Waktu</th></tr>";
- data.forEach(d=>h+=`<tr>
- <td>${d.type}</td><td>${d.ruas}</td><td><b>${d.sta}</b></td>
- <td>${d.lat.toFixed(6)}</td><td>${d.lng.toFixed(6)}</td><td>${d.time}</td></tr>`);
- t.innerHTML=h;
 }
+function exportTXT(){
+ let t="";
+ data.forEach(d=>t+=`${d.time} | ${d.type} | ${d.ruas} | ${d.sta}\n`);
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob([t]));
+ a.download="kerusakan_jalan.txt";a.click();
+}
+function toggleTable(){
+ tableWrap.style.display=tableWrap.style.display==="none"?"block":"none";
+}
+function resetAll(){
+ if(confirm("Hapus semua data?")){data=[];save();render();updateMap();}
+}
+function customType(){
+ const x=prompt("Jenis kerusakan lain:");
+ if(x)savePoint(x);
+}
+
 const map=L.map("map").setView([0,0],2);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19}).addTo(map);
 let markers=[];
@@ -165,21 +190,8 @@ function updateMap(){
  if(markers.length) map.fitBounds(L.featureGroup(markers).getBounds().pad(.3));
 }
 
-// ===== BIND =====
-btnLubang.onclick=()=>savePoint("Lubang");
-btnRetak.onclick=()=>savePoint("Retak Buaya");
-btnRumput.onclick=()=>savePoint("Rumput Tinggi");
-btnJembul.onclick=()=>savePoint("Jembul");
-btnAmblas.onclick=()=>savePoint("Amblas");
-btnLain.onclick=()=>{const x=prompt("Keterangan lain");if(x)savePoint(x);}
-btnToggle.onclick=()=>tableContainer.style.display=
- tableContainer.style.display==="none"?"block":"none";
-btnClear.onclick=()=>{if(confirm("Hapus semua?")){data=[];save();render();updateMap();}}
-
 render();updateMap();
 </script>
 
 </body>
 </html>
-
-
