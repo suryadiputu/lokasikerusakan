@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Pencatat Kerusakan Jalan + STA (Worker)</title>
+<title>Pencatat Kerusakan Jalan + STA</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
@@ -22,7 +22,15 @@ th{background:#eee}
 #map{height:45vh}
 #status{font-size:14px;margin:6px}
 #progressWrap{display:none;margin:10px}
+
 progress{width:90%;height:18px}
+
+.action-buttons{
+ display:flex;
+ flex-direction:column;
+ gap:10px;
+ margin:8px;
+}
 </style>
 </head>
 
@@ -39,11 +47,12 @@ progress{width:90%;height:18px}
   <button style="background:#90A4AE" onclick="customType()">Lain...</button>
 </div>
 
-<div style="margin:6px">
+<div class="action-buttons">
   <button style="background:#607D8B" onclick="exportCSV()">Export CSV</button>
   <button style="background:#795548" onclick="exportTXT()">Export TXT</button>
-  <button style="background:#009688" onclick="toggleTable()">Tabel</button>
+  <button style="background:#009688" onclick="toggleTable()">Tampilkan / Sembunyikan Tabel</button>
   <button style="background:#3F51B5" onclick="generateWithWorker()">Generate Ruas & STA</button>
+  <button style="background:#03A9F4" onclick="refreshLocation()">Refresh Lokasi</button>
   <button style="background:#f44336" onclick="clearAll()">Reset</button>
 </div>
 
@@ -62,15 +71,14 @@ progress{width:90%;height:18px}
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-/* ================= DATA ================= */
-let data = JSON.parse(localStorage.getItem("jalan_data")||"[]");
-let markers=[];
+let data=JSON.parse(localStorage.getItem("jalan_data")||"[]");
+let markers=[],userMarker=null,userCircle=null;
 let map=L.map('map').setView([-8.5,115.2],9);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
 function save(){localStorage.setItem("jalan_data",JSON.stringify(data));}
 
-/* ================= RECORD ================= */
+/* === RECORD === */
 function getLocation(type){
  navigator.geolocation.getCurrentPosition(p=>{
   const e={
@@ -81,20 +89,33 @@ function getLocation(type){
    acc:p.coords.accuracy,
    time:new Date().toLocaleString("id-ID"),
    gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`,
-   ruas:"",
-   sta:""
+   ruas:"",sta:""
   };
   data.push(e); save(); render();
-  document.getElementById("status").innerHTML=`Tersimpan ✔`;
+  document.getElementById("status").innerText="Tersimpan ✔";
+ },err=>alert(err.message),{enableHighAccuracy:true});
+}
+function customType(){const t=prompt("Jenis kerusakan:");if(t)getLocation(t);}
+
+/* === USER LOCATION === */
+function refreshLocation(){
+ navigator.geolocation.getCurrentPosition(p=>{
+  if(userMarker) map.removeLayer(userMarker);
+  if(userCircle) map.removeLayer(userCircle);
+
+  userMarker=L.circleMarker([p.coords.latitude,p.coords.longitude],{
+    radius:8,color:"#2196F3",fillColor:"#2196F3",fillOpacity:1
+  }).addTo(map);
+
+  userCircle=L.circle([p.coords.latitude,p.coords.longitude],{
+    radius:p.coords.accuracy,color:"#2196F3",fillOpacity:0.15
+  }).addTo(map);
+
+  map.setView([p.coords.latitude,p.coords.longitude],17);
  },err=>alert(err.message),{enableHighAccuracy:true});
 }
 
-function customType(){
- const t=prompt("Jenis kerusakan:");
- if(t) getLocation(t);
-}
-
-/* ================= TABLE ================= */
+/* === TABLE === */
 function render(){
  const t=document.getElementById("tbl");
  if(!data.length){t.innerHTML="<tr><td>Belum ada data</td></tr>";return;}
@@ -111,74 +132,48 @@ function render(){
     <button class="small-btn edit-btn" onclick="editItem(${d.id})">Edit</button>
     <button class="small-btn gmaps-btn" onclick="window.open('${d.gmaps}')">Maps</button>
     <button class="small-btn delete-btn" onclick="deleteItem(${d.id})">Hapus</button>
-   </td>
-  </tr>`;
+   </td></tr>`;
   markers.push(L.marker([d.lat,d.lng]).addTo(map));
  });
  t.innerHTML=h;
 }
 
-function editItem(id){
- const i=data.find(x=>x.id===id);
- const n=prompt("Edit jenis:",i.type);
- if(n){i.type=n;save();render();}
-}
-function deleteItem(id){
- if(confirm("Hapus data?")){
-  data=data.filter(x=>x.id!==id); save(); render();
- }
-}
+function editItem(id){const i=data.find(x=>x.id===id);const n=prompt("Edit:",i.type);if(n){i.type=n;save();render();}}
+function deleteItem(id){if(confirm("Hapus data?")){data=data.filter(x=>x.id!==id);save();render();}}
+function toggleTable(){const e=document.getElementById("tableWrap");e.style.display=e.style.display==="none"?"block":"none";render();}
+function clearAll(){if(confirm("Reset semua?")){data=[];save();render();}}
 
-function toggleTable(){
- const e=document.getElementById("tableWrap");
- e.style.display=e.style.display==="none"?"block":"none";
- render();
-}
-function clearAll(){
- if(confirm("Hapus semua data?")){
-  data=[]; save(); render();
- }
-}
+/* === EXPORT === */
+function exportCSV(){let c="type,lat,lng,ruas,sta,time\n";data.forEach(d=>c+=`"${d.type}",${d.lat},${d.lng},"${d.ruas}","${d.sta}","${d.time}"\n`);download(c,"data_jalan.csv","text/csv");}
+function exportTXT(){let t="";data.forEach(d=>t+=`Jenis:${d.type}\nLat:${d.lat}\nLng:${d.lng}\nRuas:${d.ruas}\nSTA:${d.sta}\n\n`);download(t,"data_jalan.txt","text/plain");}
+function download(c,f,t){let b=new Blob([c],{type:t});let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=f;a.click();}
 
-/* ================= EXPORT ================= */
-function exportCSV(){
- let c="type,lat,lng,ruas,sta,time\n";
- data.forEach(d=>c+=`"${d.type}",${d.lat},${d.lng},"${d.ruas}","${d.sta}","${d.time}"\n`);
- download(c,"data_jalan.csv","text/csv");
-}
-function exportTXT(){
- let t="";
- data.forEach(d=>t+=`Jenis:${d.type}\nLat:${d.lat}\nLng:${d.lng}\nRuas:${d.ruas}\nSTA:${d.sta}\n\n`);
- download(t,"data_jalan.txt","text/plain");
-}
-function download(c,f,t){
- let b=new Blob([c],{type:t});
- let a=document.createElement("a");
- a.href=URL.createObjectURL(b); a.download=f; a.click();
-}
-
-/* ================= WORKER ================= */
+/* === WORKER === */
 let worker=null;
-
 async function generateWithWorker(){
- document.getElementById("status").innerText="Mengolah GIS (Worker)...";
- document.getElementById("progressWrap").style.display="block";
+ const status=document.getElementById("status");
+ const progressWrap=document.getElementById("progressWrap");
 
- const roads = await fetch("roads.json").then(r=>r.json());
- worker = new Worker("worker-gis.js");
+ status.innerText="Mengolah GIS...";
+ progressWrap.style.display="block";
 
- worker.postMessage({data, roads});
+ const roads=await fetch("roads.json").then(r=>r.json());
+ worker=new Worker("worker-gis.js");
+ worker.postMessage({data,roads});
 
- worker.onmessage = e=>{
+ worker.onmessage=e=>{
   if(e.data.progress!==undefined){
-    document.getElementById("progressBar").value=e.data.progress;
-    document.getElementById("progressText").innerText=e.data.progress+"%";
+   progressBar.value=e.data.progress;
+   progressText.innerText=e.data.progress+"%";
   }
   if(e.data.done){
-    data=e.data.result;
-    save(); render();
-    document.getElementById("status").innerText="Generate selesai ✔";
-    worker.terminate();
+   data=e.data.result;save();render();
+   status.innerText="Generate selesai ✔";
+   worker.terminate();
+   setTimeout(()=>{
+     progressWrap.style.display="none";
+     status.innerText="Siap...";
+   },5000);
   }
  };
 }
