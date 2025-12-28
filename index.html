@@ -31,6 +31,7 @@ button{
  border-radius:10px;
  font-size:14px;
  color:#fff;
+ cursor:pointer;
 }
 
 .action-grid{
@@ -55,7 +56,12 @@ button{
  margin:1px;
 }
 
-#map{height:45vh;margin:10px;border-radius:10px}
+#map{
+ height:45vh;
+ margin:10px;
+ border-radius:10px;
+}
+
 #status{text-align:center;font-size:14px}
 
 progress{width:100%;height:16px}
@@ -63,6 +69,10 @@ progress{width:100%;height:16px}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th,td{border:1px solid #bbb;padding:5px}
 th{background:#eee}
+
+.loc-card{
+ font-size:60%;
+}
 </style>
 </head>
 
@@ -70,7 +80,7 @@ th{background:#eee}
 
 <h2>Pencatat Kerusakan Jalan</h2>
 
-<!-- PANEL 1 -->
+<!-- 1️⃣ JENIS KERUSAKAN -->
 <div class="card">
  <b>Jenis Kerusakan</b>
  <div class="btn-grid">
@@ -83,14 +93,7 @@ th{background:#eee}
  </div>
 </div>
 
-<!-- PANEL 2 -->
-<div class="card">
- <b>Lokasi Saat Ini</b>
- <div id="locInfo">Belum ada lokasi</div><br>
- <button style="background:#2196F3" onclick="refreshLocation()">Refresh Lokasi</button>
-</div>
-
-<!-- PANEL 3 -->
+<!-- 2️⃣ AKSI DATA -->
 <div class="card">
  <b>Aksi Data</b>
  <div class="action-grid">
@@ -109,11 +112,20 @@ th{background:#eee}
  <div id="progText">0%</div>
 </div>
 
+<!-- 3️⃣ TABEL -->
 <div id="tableWrap" class="card" style="display:none">
  <table id="tbl"></table>
 </div>
 
+<!-- 4️⃣ PETA -->
 <div id="map"></div>
+
+<!-- 5️⃣ LOKASI SAAT INI -->
+<div class="card loc-card">
+ <b>Lokasi Saat Ini</b>
+ <div id="locInfo">Belum ada lokasi</div><br>
+ <button style="background:#2196F3;font-size:14px" onclick="refreshLocation()">Refresh Lokasi</button>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -125,7 +137,13 @@ let markers=[],userMarker,userCircle;
 let roadsCache=null;
 
 function save(){localStorage.setItem("jalan_data",JSON.stringify(data));}
-function wita(){return new Intl.DateTimeFormat("id-ID",{timeZone:"Asia/Makassar",dateStyle:"short",timeStyle:"short"}).format(new Date())+" WITA";}
+function wita(){
+ return new Intl.DateTimeFormat("id-ID",{
+  timeZone:"Asia/Makassar",
+  dateStyle:"short",
+  timeStyle:"short"
+ }).format(new Date())+" WITA";
+}
 
 async function loadRoads(){
  if(!roadsCache) roadsCache=await fetch("roads.json").then(r=>r.json());
@@ -191,8 +209,8 @@ async function generateGIS(){
  const roads=await loadRoads();
  const worker=new Worker("worker-gis.js");
 
- document.getElementById("progressWrap").style.display="block";
- document.getElementById("status").innerText="Mengolah GIS...";
+ progressWrap.style.display="block";
+ status.innerText="Mengolah GIS...";
 
  worker.postMessage({data,roads});
 
@@ -226,25 +244,38 @@ function render(){
    <td>${d.lat.toFixed(6)}, ${d.lng.toFixed(6)}</td>
    <td>${d.time}</td>
    <td>
-    <button class="tbl-btn" onclick="edit(${d.id})">Edit</button>
+    <button class="tbl-btn" onclick="editItem(${d.id})">Edit</button>
     <button class="tbl-btn" onclick="window.open('${d.gmaps}')">Maps</button>
-    <button class="tbl-btn" onclick="del(${d.id})">Hapus</button>
+    <button class="tbl-btn" onclick="deleteItem(${d.id})">Hapus</button>
    </td>
   </tr>`;
   markers.push(L.marker([d.lat,d.lng]).addTo(map));
  });
-
  t.innerHTML=h;
 }
 
-function edit(id){
+function editItem(id){
  const d=data.find(x=>x.id===id);
  const n=prompt("Edit jenis:",d.type);
  if(n){d.type=n;save();render();}
 }
-function del(id){if(confirm("Hapus data?")){data=data.filter(x=>x.id!==id);save();render();}}
-function toggleTable(){tableWrap.style.display=tableWrap.style.display==="none"?"block":"none";render();}
-function resetAll(){if(confirm("Reset semua data?")){data=[];save();render();}}
+function deleteItem(id){
+ if(confirm("Hapus data?")){
+  data=data.filter(x=>x.id!==id);
+  save();render();
+ }
+}
+
+function toggleTable(){
+ tableWrap.style.display=tableWrap.style.display==="none"?"block":"none";
+ render();
+}
+
+function resetAll(){
+ if(confirm("Reset semua data?")){
+  data=[];save();render();
+ }
+}
 
 /* === EXPORT === */
 function exportCSV(){
@@ -261,7 +292,13 @@ function exportTXT(){
  });
  download(t,"kerusakan_jalan.txt","text/plain");
 }
-function download(c,f,t){let b=new Blob([c],{type:t});let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=f;a.click();}
+function download(c,f,t){
+ let b=new Blob([c],{type:t});
+ let a=document.createElement("a");
+ a.href=URL.createObjectURL(b);
+ a.download=f;
+ a.click();
+}
 
 render();
 </script>
