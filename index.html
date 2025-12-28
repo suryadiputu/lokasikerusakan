@@ -2,35 +2,63 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Pencatat Kerusakan Jalan + STA</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pencatat Kerusakan Jalan</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <style>
-body{font-family:Arial;margin:0;background:#f9f9f9;text-align:center}
-h2{margin:8px;font-size:18px}
-.btn-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px}
-button{padding:14px;font-size:15px;border-radius:10px;border:none;color:white}
-.small-btn{padding:4px 6px;font-size:12px;border-radius:5px;margin:1px}
-.edit-btn{background:#2196F3}
-.gmaps-btn{background:#FF9800}
-.delete-btn{background:#f44336}
-table{width:100%;border-collapse:collapse;background:#fff;font-size:12px}
+body{font-family:Arial;margin:0;background:#f4f6f8}
+h2{text-align:center;margin:10px 0}
+
+.card{
+ background:#fff;
+ margin:10px;
+ padding:10px;
+ border-radius:12px;
+ box-shadow:0 2px 6px rgba(0,0,0,.15);
+}
+
+.btn-grid{
+ display:grid;
+ grid-template-columns:repeat(2,1fr);
+ gap:8px;
+}
+
+button{
+ padding:12px;
+ border:none;
+ border-radius:10px;
+ font-size:14px;
+ color:#fff;
+}
+
+.action-grid{
+ display:grid;
+ gap:8px;
+}
+
+@media(min-width:768px){
+ .action-grid{
+  display:flex;
+  justify-content:center;
+ }
+}
+
+.small-btn{
+ font-size:12px;
+ padding:4px 6px;
+ border-radius:6px;
+}
+
+#map{height:45vh;margin:10px;border-radius:10px}
+#status{font-size:14px;text-align:center;margin:5px}
+
+progress{width:100%;height:16px}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
 th,td{border:1px solid #bbb;padding:5px}
 th{background:#eee}
-#map{height:45vh}
-#status{font-size:14px;margin:6px}
-#progressWrap{display:none;margin:10px}
-
-progress{width:90%;height:18px}
-
-.action-buttons{
- display:flex;
- flex-direction:column;
- gap:10px;
- margin:8px;
-}
 </style>
 </head>
 
@@ -38,33 +66,47 @@ progress{width:90%;height:18px}
 
 <h2>Pencatat Kerusakan Jalan</h2>
 
-<div class="btn-grid">
-  <button style="background:#FF8A65" onclick="getLocation('Lubang')">Lubang</button>
-  <button style="background:#4DB6AC" onclick="getLocation('Retak Buaya')">Retak Buaya</button>
-  <button style="background:#AED581" onclick="getLocation('Rumput Tinggi')">Rumput Tinggi</button>
-  <button style="background:#BA68C8" onclick="getLocation('Jembul')">Jembul</button>
-  <button style="background:#FFD54F;color:#333" onclick="getLocation('Amblas')">Amblas</button>
-  <button style="background:#90A4AE" onclick="customType()">Lain...</button>
+<!-- PANEL 1 -->
+<div class="card">
+ <b>Jenis Kerusakan</b>
+ <div class="btn-grid">
+  <button style="background:#FF8A65" onclick="rec('Lubang')">Lubang</button>
+  <button style="background:#4DB6AC" onclick="rec('Retak Buaya')">Retak Buaya</button>
+  <button style="background:#AED581" onclick="rec('Rumput Tinggi')">Rumput Tinggi</button>
+  <button style="background:#BA68C8" onclick="rec('Jembul')">Jembul</button>
+  <button style="background:#FFD54F;color:#333" onclick="rec('Amblas')">Amblas</button>
+  <button style="background:#90A4AE" onclick="custom()">Lain...</button>
+ </div>
 </div>
 
-<div class="action-buttons">
+<!-- PANEL 2 -->
+<div class="card">
+ <b>Lokasi Saat Ini</b>
+ <div id="locInfo">Belum ada data lokasi</div>
+ <br>
+ <button style="background:#2196F3" onclick="refreshLocation()">Refresh Lokasi</button>
+</div>
+
+<!-- PANEL 3 -->
+<div class="card">
+ <b>Aksi Data</b>
+ <div class="action-grid">
   <button style="background:#607D8B" onclick="exportCSV()">Export CSV</button>
   <button style="background:#795548" onclick="exportTXT()">Export TXT</button>
-  <button style="background:#009688" onclick="toggleTable()">Tampilkan / Sembunyikan Tabel</button>
-  <button style="background:#3F51B5" onclick="generateWithWorker()">Generate Ruas & STA</button>
-  <button style="background:#03A9F4" onclick="refreshLocation()">Refresh Lokasi</button>
-  <button style="background:#f44336" onclick="clearAll()">Reset</button>
+  <button style="background:#009688" onclick="toggleTable()">Tabel</button>
+  <button style="background:#3F51B5" onclick="generateGIS()">Generate Ruas</button>
+  <button style="background:#f44336" onclick="resetAll()">Reset</button>
+ </div>
 </div>
 
 <div id="status">Siap...</div>
-
-<div id="progressWrap">
-  <progress id="progressBar" value="0" max="100"></progress>
-  <div id="progressText">0%</div>
+<div id="progressWrap" style="display:none" class="card">
+ <progress id="prog" value="0" max="100"></progress>
+ <div id="progText">0%</div>
 </div>
 
-<div id="tableWrap" style="display:none">
-<table id="tbl"></table>
+<div id="tableWrap" style="display:none" class="card">
+ <table id="tbl"></table>
 </div>
 
 <div id="map"></div>
@@ -72,111 +114,86 @@ progress{width:90%;height:18px}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 let data=JSON.parse(localStorage.getItem("jalan_data")||"[]");
-let markers=[],userMarker=null,userCircle=null;
 let map=L.map('map').setView([-8.5,115.2],9);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+let userMarker,userCircle,markers=[];
 
 function save(){localStorage.setItem("jalan_data",JSON.stringify(data));}
+function wita(){return new Intl.DateTimeFormat("id-ID",{timeZone:"Asia/Makassar",dateStyle:"short",timeStyle:"short"}).format(new Date())+" WITA";}
 
-/* === RECORD === */
-function getLocation(type){
+function rec(type){
  navigator.geolocation.getCurrentPosition(p=>{
-  const e={
+  data.push({
    id:Date.now(),
    type,
    lat:p.coords.latitude,
    lng:p.coords.longitude,
-   acc:p.coords.accuracy,
-   time:new Date().toLocaleString("id-ID"),
-   gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`,
-   ruas:"",sta:""
-  };
-  data.push(e); save(); render();
-  document.getElementById("status").innerText="Tersimpan ✔";
- },err=>alert(err.message),{enableHighAccuracy:true});
+   time:wita(),
+   ruas:"",
+   sta:"",
+   gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
+  });
+  save();render();
+  status.innerText="Tersimpan ✔";
+ },e=>alert(e.message),{enableHighAccuracy:true});
 }
-function customType(){const t=prompt("Jenis kerusakan:");if(t)getLocation(t);}
 
-/* === USER LOCATION === */
+function custom(){const t=prompt("Jenis:");if(t)rec(t);}
+
 function refreshLocation(){
  navigator.geolocation.getCurrentPosition(p=>{
-  if(userMarker) map.removeLayer(userMarker);
-  if(userCircle) map.removeLayer(userCircle);
-
-  userMarker=L.circleMarker([p.coords.latitude,p.coords.longitude],{
-    radius:8,color:"#2196F3",fillColor:"#2196F3",fillOpacity:1
-  }).addTo(map);
-
-  userCircle=L.circle([p.coords.latitude,p.coords.longitude],{
-    radius:p.coords.accuracy,color:"#2196F3",fillOpacity:0.15
-  }).addTo(map);
-
+  if(userMarker)map.removeLayer(userMarker);
+  if(userCircle)map.removeLayer(userCircle);
+  userMarker=L.circleMarker([p.coords.latitude,p.coords.longitude],{radius:8,color:"#2196F3",fillOpacity:1}).addTo(map);
+  userCircle=L.circle([p.coords.latitude,p.coords.longitude],{radius:p.coords.accuracy,color:"#2196F3",fillOpacity:.2}).addTo(map);
   map.setView([p.coords.latitude,p.coords.longitude],17);
- },err=>alert(err.message),{enableHighAccuracy:true});
+  document.getElementById("locInfo").innerHTML=
+   `Lat: ${p.coords.latitude.toFixed(6)}<br>
+    Lng: ${p.coords.longitude.toFixed(6)}`;
+ });
 }
 
-/* === TABLE === */
 function render(){
  const t=document.getElementById("tbl");
  if(!data.length){t.innerHTML="<tr><td>Belum ada data</td></tr>";return;}
- let h="<tr><th>Jenis</th><th>Lat</th><th>Lng</th><th>Ruas</th><th>STA</th><th>Aksi</th></tr>";
- markers.forEach(m=>map.removeLayer(m)); markers=[];
+ let h="<tr><th>Jenis</th><th>Ruas + STA</th><th>Koordinat</th><th>Waktu</th><th>Aksi</th></tr>";
+ markers.forEach(m=>map.removeLayer(m));markers=[];
  data.forEach(d=>{
   h+=`<tr>
    <td>${d.type}</td>
-   <td>${d.lat.toFixed(6)}</td>
-   <td>${d.lng.toFixed(6)}</td>
-   <td>${d.ruas}</td>
-   <td>${d.sta}</td>
+   <td>${d.ruas} ${d.sta}</td>
+   <td>${d.lat.toFixed(6)}, ${d.lng.toFixed(6)}</td>
+   <td>${d.time}</td>
    <td>
-    <button class="small-btn edit-btn" onclick="editItem(${d.id})">Edit</button>
-    <button class="small-btn gmaps-btn" onclick="window.open('${d.gmaps}')">Maps</button>
-    <button class="small-btn delete-btn" onclick="deleteItem(${d.id})">Hapus</button>
+    <button class="small-btn" onclick="window.open('${d.gmaps}')">Maps</button>
+    <button class="small-btn" onclick="del(${d.id})">Hapus</button>
    </td></tr>`;
   markers.push(L.marker([d.lat,d.lng]).addTo(map));
  });
  t.innerHTML=h;
 }
 
-function editItem(id){const i=data.find(x=>x.id===id);const n=prompt("Edit:",i.type);if(n){i.type=n;save();render();}}
-function deleteItem(id){if(confirm("Hapus data?")){data=data.filter(x=>x.id!==id);save();render();}}
-function toggleTable(){const e=document.getElementById("tableWrap");e.style.display=e.style.display==="none"?"block":"none";render();}
-function clearAll(){if(confirm("Reset semua?")){data=[];save();render();}}
+function del(id){if(confirm("Hapus?")){data=data.filter(x=>x.id!==id);save();render();}}
+function toggleTable(){tableWrap.style.display=tableWrap.style.display==="none"?"block":"none";render();}
+function resetAll(){if(confirm("Reset semua?")){data=[];save();render();}}
 
-/* === EXPORT === */
-function exportCSV(){let c="type,lat,lng,ruas,sta,time\n";data.forEach(d=>c+=`"${d.type}",${d.lat},${d.lng},"${d.ruas}","${d.sta}","${d.time}"\n`);download(c,"data_jalan.csv","text/csv");}
-function exportTXT(){let t="";data.forEach(d=>t+=`Jenis:${d.type}\nLat:${d.lat}\nLng:${d.lng}\nRuas:${d.ruas}\nSTA:${d.sta}\n\n`);download(t,"data_jalan.txt","text/plain");}
-function download(c,f,t){let b=new Blob([c],{type:t});let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=f;a.click();}
-
-/* === WORKER === */
-let worker=null;
-async function generateWithWorker(){
- const status=document.getElementById("status");
- const progressWrap=document.getElementById("progressWrap");
-
- status.innerText="Mengolah GIS...";
- progressWrap.style.display="block";
-
- const roads=await fetch("roads.json").then(r=>r.json());
- worker=new Worker("worker-gis.js");
- worker.postMessage({data,roads});
-
- worker.onmessage=e=>{
-  if(e.data.progress!==undefined){
-   progressBar.value=e.data.progress;
-   progressText.innerText=e.data.progress+"%";
-  }
-  if(e.data.done){
-   data=e.data.result;save();render();
-   status.innerText="Generate selesai ✔";
-   worker.terminate();
-   setTimeout(()=>{
-     progressWrap.style.display="none";
-     status.innerText="Siap...";
-   },5000);
-  }
- };
+function exportCSV(){
+ let c="Jenis,Ruas+STA,Koordinat,Waktu (WITA),Google Maps\n";
+ data.forEach(d=>{
+  c+=`"${d.type}","${d.ruas} ${d.sta}","${d.lat},${d.lng}","${d.time}","${d.gmaps}"\n`;
+ });
+ download(c,"kerusakan_jalan.csv","text/csv");
 }
+
+function exportTXT(){
+ let t="";
+ data.forEach(d=>{
+  t+=`Jenis: ${d.type}\nRuas+STA: ${d.ruas} ${d.sta}\nKoordinat: ${d.lat},${d.lng}\nWaktu: ${d.time}\nMaps: ${d.gmaps}\n\n`;
+ });
+ download(t,"kerusakan_jalan.txt","text/plain");
+}
+
+function download(c,f,t){let b=new Blob([c],{type:t});let a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=f;a.click();}
 
 render();
 </script>
