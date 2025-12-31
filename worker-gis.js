@@ -1,61 +1,109 @@
-// worker-gis.js
-let roads = [];
+/* worker-gis.js
+   FINAL – Batch + Single mode + Progress
+*/
 
-self.onmessage = async (e) => {
-  const { type, payload } = e.data;
+let roads = null;
 
-  if (type === "INIT") {
-    roads = payload;
-    self.postMessage({ type: "READY" });
-  }
-
-  if (type === "GENERATE_ALL") {
-    const results = payload.map(p => ({
-      id: p.id,
-      ...findNearest(p.lat, p.lng)
-    }));
-    self.postMessage({ type: "RESULT_ALL", results });
-  }
-
-  if (type === "SINGLE_POINT") {
-    const res = findNearest(payload.lat, payload.lng);
-    self.postMessage({ type: "RESULT_SINGLE", result: res });
-  }
-};
-
-function haversine(a, b) {
-  const R = 6371000;
-  const dLat = (b[1] - a[1]) * Math.PI / 180;
-  const dLng = (b[0] - a[0]) * Math.PI / 180;
-  const lat1 = a[1] * Math.PI / 180;
-  const lat2 = b[1] * Math.PI / 180;
-  const x = Math.sin(dLat/2)**2 +
-            Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)**2;
-  return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+/* =========================
+   LOAD ROADS.JSON (sekali)
+========================= */
+async function loadRoads() {
+  if (roads) return roads;
+  const res = await fetch("roads.json");
+  roads = await res.json();
+  return roads;
 }
 
-function findNearest(lat, lng) {
-  let best = { dist: Infinity };
+/* =========================
+   UTIL GIS
+========================= */
+function toRad(d) {
+  return d * Math.PI / 180;
+}
 
-  roads.forEach(r => {
-    let acc = 0;
-    for (let i=0;i<r.polyline.length-1;i++) {
-      const a = r.polyline[i];
-      const b = r.polyline[i+1];
-      const d = haversine([lng,lat], a);
-      if (d < best.dist) {
-        best = {
-          dist: d,
-          road: r.name,
-          sta: Math.round(r.sta_start + acc)
-        };
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/* =========================
+   HITUNG STA TERDEKAT
+========================= */
+function findNearestRoad(lat, lng, roads) {
+  let best = {
+    dist: Infinity,
+    road: null,
+    sta: null
+  };
+
+  roads.forEach(road => {
+    let accDist = 0;
+
+    for (let i = 0; i < road.polyline.length - 1; i++) {
+      const [lng1, lat1] = road.polyline[i];
+      const [lng2, lat2] = road.polyline[i + 1];
+
+      const d1 = haversine(lat, lng, lat1, lng1);
+      const d2 = haversine(lat, lng, lat2, lng2);
+      const segLen = haversine(lat1, lng1, lat2, lng2);
+
+      const minD = Math.min(d1, d2);
+
+      if (minD < best.dist) {
+        best.dist = minD;
+        best.road = road;
+        best.sta = road.sta_start + accDist;
       }
-      acc += haversine(a,b);
+
+      accDist += segLen;
     }
   });
 
   return {
-    road: best.road || "",
-    sta: best.sta || ""
+    ruas: best.road ? best.road.name : "Tidak diketahui",
+    sta: best.road
+      ? "STA " + Math.round(best.sta)
+      : "-"
   };
 }
+
+/* =========================
+   MESSAGE HANDLER
+========================= */
+onmessage = async function (e) {
+  const roads = await loadRoads();
+
+  /* ===== MODE SINGLE (refresh lokasi) ===== */
+  if (e.data.mode === "single") {
+    const { lat, lng } = e.data.point;
+    const res = findNearestRoad(lat, lng, roads);
+    postMessage(res);
+    return;
+  }
+
+  /* ===== MODE BATCH (generate ruas) ===== */
+  let data = e.data;
+
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i];
+    const res = findNearestRoad(d.lat, d.lng, roads);
+    d.ruas = res.ruas;
+    d.sta = res.sta;
+
+    /* Progress setiap 10 titik */
+    if (i % 10 === 0) {
+      postMessage({
+        progress: Math.round((i / data.length) * 100)
+      });
+    }
+  }
+
+  postMessage(data);
+};
