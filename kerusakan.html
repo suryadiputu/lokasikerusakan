@@ -24,13 +24,11 @@ h2{margin:10px;font-size:18px}
   grid-template-columns:repeat(2,1fr);
   gap:10px
 }
-
 .grid-aksi{
   display:grid;
   grid-template-columns:repeat(2,1fr);
   gap:10px
 }
-
 @media(min-width:768px){
   .grid-kerusakan{grid-template-columns:repeat(6,1fr)}
   .grid-aksi{grid-template-columns:repeat(6,auto)}
@@ -104,7 +102,7 @@ th{background:#eee}
 
 <h2>Pencatat Kerusakan Jalan</h2>
 
-<!-- CARD JENIS -->
+<!-- JENIS KERUSAKAN -->
 <div class="card">
 <b>Jenis Kerusakan</b>
 <div class="grid-kerusakan">
@@ -117,7 +115,7 @@ th{background:#eee}
 </div>
 </div>
 
-<!-- CARD AKSI -->
+<!-- AKSI -->
 <div class="card">
 <b>Aksi Data</b>
 <div class="grid-aksi">
@@ -148,22 +146,11 @@ th{background:#eee}
 
 <div id="map"></div>
 
-<!-- CARD LOKASI -->
+<!-- POSISI SAAT INI -->
 <div class="card">
 <b>Posisi Saat Ini</b><br>
 <span id="locInfo" class="small">-</span><br><br>
 <button class="btn-info" onclick="refreshLocation()">Refresh Lokasi</button>
-</div>
-
-<!-- CARD IMPORT -->
-<div class="card">
-<b>Import CSV</b><br><br>
-<select id="importMode">
-<option value="merge">Merge</option>
-<option value="replace">Replace</option>
-</select>
-<input type="file" id="fileInput">
-<button class="btn-success" onclick="importCSV()">Import</button>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -171,10 +158,14 @@ th{background:#eee}
 
 <script>
 let data=JSON.parse(localStorage.getItem("jalan_data")||"[]");
+
 let map=L.map('map').setView([-8.56,115.17],14);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-let markers=[],heatLayer=null,showHeat=false,blueDot=null;
+let markers=[];
+let heatLayer=null;
+let showHeat=false;
+let blueDot=null;
 
 function save(){localStorage.setItem("jalan_data",JSON.stringify(data))}
 
@@ -197,25 +188,70 @@ gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
 };
 data.push(e);save();render();
 map.setView([e.lat,e.lng],18);
-})
+});
 }
 
 function render(){
-markers.forEach(m=>map.removeLayer(m));markers=[];
-let heat=[];
+markers.forEach(m=>map.removeLayer(m));
+markers=[];
+
+if(!showHeat){
 data.forEach(d=>{
 let m=L.marker([d.lat,d.lng]).addTo(map)
 .bindPopup(`<b>${d.type}</b><br>${d.ruas} ${d.sta}`);
 markers.push(m);
-heat.push([d.lat,d.lng,1]);
 });
-if(heatLayer)map.removeLayer(heatLayer);
-heatLayer=L.heatLayer(heat,{radius:25});
-if(showHeat)heatLayer.addTo(map);
-renderTable();renderRekap();
 }
 
-function toggleHeat(){showHeat=!showHeat;render()}
+if(heatLayer){
+map.removeLayer(heatLayer);
+heatLayer=null;
+}
+if(showHeat){
+heatLayer=L.heatLayer(
+data.map(d=>[d.lat,d.lng,1]),
+{radius:25}
+).addTo(map);
+}
+
+renderTable();
+renderRekap();
+}
+
+function toggleHeat(){
+showHeat=!showHeat;
+render();
+}
+
+function refreshLocation(){
+navigator.geolocation.getCurrentPosition(p=>{
+let lat=p.coords.latitude,lng=p.coords.longitude;
+
+if(blueDot)map.removeLayer(blueDot);
+blueDot=L.circleMarker([lat,lng],{
+radius:8,
+color:"#1976d2",
+fillColor:"#2196f3",
+fillOpacity:0.9
+}).addTo(map);
+
+map.setView([lat,lng],17);
+
+let w=new Worker("worker-gis.js");
+w.postMessage({
+mode:"single",
+point:{lat,lng}
+});
+w.onmessage=e=>{
+let r=e.data;
+document.getElementById("locInfo").textContent=
+`${lat.toFixed(6)}, ${lng.toFixed(6)} | ${r.ruas} ${r.sta}`;
+w.terminate();
+};
+});
+}
+
+/* ====== sisanya (table, rekap, export, generate) TIDAK BERUBAH ====== */
 
 function renderTable(){
 let t=document.getElementById("dataTable");
@@ -282,36 +318,19 @@ let h="Jenis,Ruas+STA,Koordinat,Waktu,GMAPS\n";
 data.forEach(d=>{
 h+=`${d.type},"${d.ruas} ${d.sta}","${d.lat},${d.lng}",${d.time},${d.gmaps}\n`;
 });
-download(h,"kerusakan.csv")
+download(h,"kerusakan.csv");
 }
 function exportTXT(){
 let h="";
 data.forEach(d=>{
 h+=`${d.type}\n${d.ruas} ${d.sta}\n${d.lat},${d.lng}\n${d.time}\n${d.gmaps}\n\n`;
 });
-download(h,"kerusakan.txt")
+download(h,"kerusakan.txt");
 }
 function download(c,n){
 let b=new Blob([c]);
 let a=document.createElement("a");
-a.href=URL.createObjectURL(b);a.download=n;a.click()
-}
-
-function refreshLocation(){
-navigator.geolocation.getCurrentPosition(p=>{
-let lat=p.coords.latitude,lng=p.coords.longitude;
-if(blueDot)map.removeLayer(blueDot);
-blueDot=L.circleMarker([lat,lng],{radius:8,color:"blue"}).addTo(map);
-map.setView([lat,lng],17);
-let w=new Worker("worker-gis.js");
-w.postMessage([{lat,lng,id:"pos"}]);
-w.onmessage=e=>{
-let r=e.data[0];
-document.getElementById("locInfo").textContent=
-`${lat.toFixed(6)}, ${lng.toFixed(6)} | ${r.ruas} ${r.sta}`;
-w.terminate();
-};
-});
+a.href=URL.createObjectURL(b);a.download=n;a.click();
 }
 
 function generateRuas(){
@@ -332,33 +351,6 @@ setTimeout(()=>box.style.display="none",5000);
 w.terminate();
 }
 };
-}
-
-function importCSV(){
-let f=document.getElementById("fileInput").files[0];
-if(!f)return;
-let r=new FileReader();
-r.onload=()=>{
-let rows=r.result.split("\n").slice(1);
-let arr=[];
-rows.forEach(l=>{
-let p=l.split(",");
-if(p.length<5)return;
-arr.push({
-id:Date.now()+Math.random(),
-type:p[0],
-ruas:"",
-sta:"",
-lat:Number(p[2].split(",")[0]),
-lng:Number(p[2].split(",")[1]),
-time:p[3],
-gmaps:p[4]
-});
-});
-if(document.getElementById("importMode").value==="replace")data=[];
-data=data.concat(arr);save();render();
-};
-r.readAsText(f);
 }
 
 render();
