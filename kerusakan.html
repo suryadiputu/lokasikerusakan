@@ -1,230 +1,282 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-<title>Pencatat Kerusakan Jalan + STA</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Survey Kerusakan Jalan</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
-body{font-family:Arial;margin:0;background:#f9f9f9;text-align:center}
-h2{margin:8px;font-size:18px}
-.btn-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px}
-button{padding:14px;font-size:15px;border-radius:10px;border:none;color:white}
-.small-btn{padding:4px 6px;font-size:12px;border-radius:5px;margin:1px}
-.edit-btn{background:#2196F3}
-.gmaps-btn{background:#FF9800}
-.delete-btn{background:#f44336}
-table{width:100%;border-collapse:collapse;background:#fff;font-size:12px}
-th,td{border:1px solid #bbb;padding:5px}
+body{font-family:Arial;margin:0;background:#f4f4f4}
+.card{background:#fff;margin:10px;border-radius:10px;padding:10px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+h3{margin:5px 0;font-size:15px}
+.btn-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px}
+button{padding:10px 12px;border:none;border-radius:8px;color:#fff;font-size:14px;cursor:pointer}
+button.small{font-size:12px;padding:6px}
+.gray{background:#555}
+.active{background:#1976D2}
+#map{height:45vh;margin:10px;border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{border:1px solid #ccc;padding:5px;text-align:center}
 th{background:#eee}
-#map{height:45vh}
-#status{font-size:14px;margin:6px}
-#progressWrap{display:none;margin:10px}
-progress{width:90%;height:18px}
+.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
+.smalltext{font-size:60%;color:#333}
+@media(min-width:768px){
+  .btn-grid{grid-template-columns:repeat(3,1fr)}
+  .actions{grid-template-columns:repeat(3,1fr)}
+}
 </style>
 </head>
 
 <body>
 
-<h2>Pencatat Kerusakan Jalan</h2>
-
+<!-- CARD JENIS KERUSAKAN -->
+<div class="card">
+<h3>Jenis Kerusakan</h3>
 <div class="btn-grid">
-  <button style="background:#FF8A65" onclick="getLocation('Lubang')">Lubang</button>
-  <button style="background:#4DB6AC" onclick="getLocation('Retak Buaya')">Retak Buaya</button>
-  <button style="background:#AED581" onclick="getLocation('Rumput Tinggi')">Rumput Tinggi</button>
-  <button style="background:#BA68C8" onclick="getLocation('Jembul')">Jembul</button>
-  <button style="background:#FFD54F;color:#333" onclick="getLocation('Amblas')">Amblas</button>
-  <button style="background:#90A4AE" onclick="customType()">Lain...</button>
+<button style="background:#FF7043" onclick="savePoint('Lubang')">Lubang</button>
+<button style="background:#26A69A" onclick="savePoint('Retak Buaya')">Retak Buaya</button>
+<button style="background:#9CCC65" onclick="savePoint('Rumput Tinggi')">Rumput Tinggi</button>
+<button style="background:#BA68C8" onclick="savePoint('Jembul')">Jembul</button>
+<button style="background:#FFD54F;color:#333" onclick="savePoint('Amblas')">Amblas</button>
+<button style="background:#90A4AE" onclick="customType()">Lain...</button>
+</div>
 </div>
 
-<div style="margin:6px">
-  <button style="background:#607D8B" onclick="exportCSV()">Export CSV</button>
-  <button style="background:#795548" onclick="exportTXT()">Export TXT</button>
-  <button style="background:#009688" onclick="toggleTable()">Tabel</button>
-  <button style="background:#3F51B5" onclick="generateRuasSTA()">Generate Ruas & STA</button>
-  <button style="background:#f44336" onclick="clearAll()">Reset</button>
+<!-- CARD AKSI -->
+<div class="card">
+<h3>Aksi Data</h3>
+<div class="btn-row">
+<button class="gray" onclick="exportCSV()">Export CSV</button>
+<button class="gray" onclick="exportTXT()">Export TXT</button>
+<button class="gray" onclick="toggleTable()">Data</button>
+<button class="gray" onclick="toggleRekap()">Rekap</button>
+<button class="gray" onclick="resetData()">Reset</button>
+</div>
 </div>
 
-<div id="status">Siap...</div>
-
-<div id="progressWrap">
-  <progress id="progressBar" value="0" max="100"></progress>
-  <div id="progressText">0%</div>
+<!-- CARD TOGGLE MAP MODE -->
+<div class="card">
+<h3>Tampilan Peta</h3>
+<div class="btn-row">
+<button id="btnPoint" class="active" onclick="setMapMode('point')">POINT</button>
+<button id="btnHeat" class="gray" onclick="setMapMode('heat')">HEATMAP</button>
+</div>
 </div>
 
-<div id="tableWrap" style="display:none">
-<table id="tbl"></table>
+<!-- TABEL DATA -->
+<div class="card" id="tableBox" style="display:none">
+<table id="dataTable"></table>
 </div>
 
+<!-- TABEL REKAP -->
+<div class="card" id="rekapBox" style="display:none">
+<table id="rekapTable"></table>
+</div>
+
+<!-- MAP -->
 <div id="map"></div>
 
+<!-- CARD LOKASI -->
+<div class="card">
+<h3>Posisi Saat Ini</h3>
+<div id="currentLoc" class="smalltext">Belum ada</div>
+<button class="gray small" onclick="refreshLocation()">Refresh Lokasi</button>
+</div>
+
+<!-- CARD IMPORT -->
+<div class="card">
+<h3>Import Data CSV</h3>
+<div class="btn-row">
+<input type="file" id="importFile" accept=".csv"/>
+<select id="importMode">
+<option value="merge">Merge</option>
+<option value="replace">Replace</option>
+</select>
+</div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
 <script>
-/* ================= DATA ================= */
 let data = JSON.parse(localStorage.getItem("jalan_data")||"[]");
-let roads=null, markers=[];
-let map=L.map('map').setView([-8.5,115.2],9);
+let map = L.map('map').setView([-8.56,115.17],15);
+let markers=[], heatLayer=null, userMarker=null;
+let mapMode="point";
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-function save(){localStorage.setItem("jalan_data",JSON.stringify(data));}
+function saveLocal(){localStorage.setItem("jalan_data",JSON.stringify(data))}
 
-/* ================= RECORD ================= */
-function getLocation(type){
+function savePoint(type){
  navigator.geolocation.getCurrentPosition(p=>{
-  const e={
+  let lat=p.coords.latitude,lng=p.coords.longitude;
+  let e={
    id:Date.now(),
-   type,
-   lat:p.coords.latitude,
-   lng:p.coords.longitude,
-   acc:p.coords.accuracy,
-   time:new Date().toLocaleString("id-ID"),
-   gmaps:`https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`,
-   ruas:"",
-   sta:""
+   type,lat,lng,
+   time:new Date().toLocaleString("id-ID",{timeZone:"Asia/Makassar"}),
+   ruas:"",sta:"",
+   gmaps:`https://www.google.com/maps?q=${lat},${lng}`
   };
-  data.push(e); save(); render();
-  document.getElementById("status").innerHTML=`Tersimpan ✔ <a href="${e.gmaps}" target="_blank">Maps</a>`;
- },err=>alert(err.message),{enableHighAccuracy:true});
+  data.push(e);saveLocal();
+  renderLayers();
+  map.setView([lat,lng],18);
+ });
 }
 
 function customType(){
- const t=prompt("Jenis kerusakan:");
- if(t) getLocation(t);
+ let t=prompt("Jenis kerusakan");
+ if(t) savePoint(t);
 }
 
-/* ================= TABLE & MAP ================= */
-function render(){
- const t=document.getElementById("tbl");
- if(!data.length){t.innerHTML="<tr><td>Belum ada data</td></tr>";return;}
- let h="<tr><th>Jenis</th><th>Lat</th><th>Lng</th><th>Ruas</th><th>STA</th><th>Aksi</th></tr>";
- markers.forEach(m=>map.removeLayer(m)); markers=[];
+function renderLayers(){
+ markers.forEach(m=>map.removeLayer(m));
+ markers=[];
+ if(heatLayer){map.removeLayer(heatLayer);heatLayer=null}
+
+ if(mapMode==="point"){
+  data.forEach(d=>{
+   markers.push(L.marker([d.lat,d.lng]).addTo(map));
+  });
+ } else {
+  let pts=data.map(d=>[d.lat,d.lng,1]);
+  heatLayer=L.heatLayer(pts,{radius:25,blur:18,maxZoom:17}).addTo(map);
+ }
+ renderTable();
+}
+
+function setMapMode(mode){
+ mapMode=mode;
+ document.getElementById("btnPoint").className=mode==="point"?"active":"gray";
+ document.getElementById("btnHeat").className=mode==="heat"?"active":"gray";
+ renderLayers();
+}
+
+function renderTable(){
+ let t=document.getElementById("dataTable");
+ if(!data.length){t.innerHTML="<tr><td>Kosong</td></tr>";return}
+ let h="<tr><th>Jenis</th><th>Ruas+STA</th><th>Koordinat</th><th>Waktu</th><th>Aksi</th></tr>";
  data.forEach(d=>{
   h+=`<tr>
-   <td>${d.type}</td>
-   <td>${d.lat.toFixed(6)}</td>
-   <td>${d.lng.toFixed(6)}</td>
-   <td>${d.ruas}</td>
-   <td>${d.sta}</td>
-   <td>
-    <button class="small-btn edit-btn" onclick="editItem(${d.id})">Edit</button>
-    <button class="small-btn gmaps-btn" onclick="window.open('${d.gmaps}','_blank')">Maps</button>
-    <button class="small-btn delete-btn" onclick="deleteItem(${d.id})">Hapus</button>
-   </td>
-  </tr>`;
-  markers.push(L.marker([d.lat,d.lng]).addTo(map));
+<td>${d.type}</td>
+<td>${d.ruas||""} ${d.sta||""}</td>
+<td>${d.lat.toFixed(6)},${d.lng.toFixed(6)}</td>
+<td>${d.time}</td>
+<td class="actions">
+<button class="gray small" onclick="edit(${d.id})">Edit</button>
+<button class="gray small" onclick="window.open('${d.gmaps}')">Gmaps</button>
+<button class="gray small" onclick="del(${d.id})">Hapus</button>
+</td></tr>`;
  });
  t.innerHTML=h;
 }
 
-function editItem(id){
- const i=data.find(x=>x.id===id);
- if(!i)return;
- const n=prompt("Edit jenis:",i.type);
- if(n){i.type=n; save(); render();}
-}
-
-function deleteItem(id){
- if(confirm("Hapus data ini?")){
-  data=data.filter(x=>x.id!==id);
-  save(); render();
- }
+function buildRekap(){
+ let r={};
+ data.forEach(d=>{
+  let k=d.ruas||"Tanpa Ruas";
+  if(!r[k]) r[k]={total:0,Lubang:0,"Retak Buaya":0,Jembul:0,Amblas:0,"Rumput Tinggi":0,Lainnya:0};
+  r[k].total++;
+  r[k][d.type]!==undefined ? r[k][d.type]++ : r[k].Lainnya++;
+ });
+ let h="<tr><th>Ruas</th><th>Total</th><th>Lubang</th><th>Retak</th><th>Jembul</th><th>Amblas</th><th>Rumput</th><th>Lain</th></tr>";
+ Object.keys(r).forEach(k=>{
+  let x=r[k];
+  h+=`<tr><td>${k}</td><td>${x.total}</td><td>${x.Lubang}</td><td>${x["Retak Buaya"]}</td><td>${x.Jembul}</td><td>${x.Amblas}</td><td>${x["Rumput Tinggi"]}</td><td>${x.Lainnya}</td></tr>`;
+ });
+ document.getElementById("rekapTable").innerHTML=h;
 }
 
 function toggleTable(){
- const e=document.getElementById("tableWrap");
- e.style.display=e.style.display==="none"?"block":"none";
- render();
+ let b=document.getElementById("tableBox");
+ b.style.display=b.style.display==="none"?"block":"none";
+}
+function toggleRekap(){
+ let b=document.getElementById("rekapBox");
+ b.style.display=b.style.display==="none"?"block":"none";
+ buildRekap();
 }
 
-function clearAll(){
- if(confirm("Hapus semua data?")){
-  data=[]; save(); render();
+function edit(id){
+ let i=data.findIndex(x=>x.id===id);
+ let t=prompt("Edit jenis",data[i].type);
+ if(t){data[i].type=t;saveLocal();renderLayers();}
+}
+function del(id){
+ if(confirm("Hapus?")){
+  data=data.filter(x=>x.id!==id);
+  saveLocal();renderLayers();
  }
 }
 
-/* ================= EXPORT ================= */
 function exportCSV(){
- let c="type,lat,lng,ruas,sta,time\n";
- data.forEach(d=>c+=`"${d.type}",${d.lat},${d.lng},"${d.ruas}","${d.sta}","${d.time}"\n`);
- download(c,"data_jalan.csv","text/csv");
+ let csv="Jenis Kerusakan,Ruas+STA,Koordinat,Waktu Survei (WITA),Link GMaps\n";
+ data.forEach(d=>{
+  csv+=`"${d.type}","${d.ruas||""} ${d.sta||""}","${d.lat},${d.lng}","${d.time}","${d.gmaps}"\n`;
+ });
+ download(csv,"survey.csv","text/csv");
 }
 function exportTXT(){
  let t="";
- data.forEach(d=>t+=`Jenis:${d.type}\nLat:${d.lat}\nLng:${d.lng}\nRuas:${d.ruas}\nSTA:${d.sta}\n\n`);
- download(t,"data_jalan.txt","text/plain");
+ data.forEach(d=>{
+  t+=`${d.type}\n${d.ruas||""} ${d.sta||""}\n${d.lat},${d.lng}\n${d.time}\n${d.gmaps}\n\n`;
+ });
+ download(t,"survey.txt","text/plain");
 }
-function download(c,f,t){
+function download(c,n,t){
  let b=new Blob([c],{type:t});
  let a=document.createElement("a");
- a.href=URL.createObjectURL(b); a.download=f; a.click();
+ a.href=URL.createObjectURL(b);
+ a.download=n;a.click();
 }
 
-/* ================= GIS ================= */
-function haversine(lat1,lng1,lat2,lng2){
- const R=6371000,toRad=x=>x*Math.PI/180;
- const dLat=toRad(lat2-lat1),dLng=toRad(lng2-lng1);
- const a=Math.sin(dLat/2)**2+
-  Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)**2;
- return 2*R*Math.asin(Math.sqrt(a));
+function refreshLocation(){
+ navigator.geolocation.getCurrentPosition(p=>{
+  let lat=p.coords.latitude,lng=p.coords.longitude;
+  if(userMarker) map.removeLayer(userMarker);
+  userMarker=L.circleMarker([lat,lng],{radius:8,color:"blue"}).addTo(map);
+  map.setView([lat,lng],17);
+  document.getElementById("currentLoc").textContent=`${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+ });
 }
 
-function staAlongPolyline(point, poly){
- let acc=0,best={dist:1e12,sta:0};
- for(let i=1;i<poly.length;i++){
-  const p1=poly[i-1],p2=poly[i];
-  const seg=haversine(p1[1],p1[0],p2[1],p2[0]);
-  const d=haversine(point.lat,point.lng,p2[1],p2[0]);
-  if(d<best.dist) best={dist:d,sta:acc};
-  acc+=seg;
- }
- return best;
-}
-
-/* ================= GENERATE + PROGRESS ================= */
-async function generateRuasSTA(){
- document.getElementById("status").innerText="Mengolah GIS...";
- document.getElementById("progressWrap").style.display="block";
- const bar=document.getElementById("progressBar");
- const txt=document.getElementById("progressText");
-
- roads = roads || await fetch("roads.json").then(r=>r.json());
-
- let total=data.length, done=0;
-
- for(const d of data){
-  if(d.ruas){done++;continue;}
-
-  let bestRoad=null,bestSta=0,minDist=1e12;
-
-  roads.forEach(r=>{
-    const res=staAlongPolyline(d,r.polyline);
-    if(res.dist<minDist){
-      minDist=res.dist;
-      bestRoad=r;
-      bestSta=r.sta_start+res.sta;
-    }
+document.getElementById("importFile").addEventListener("change",e=>{
+ let f=e.target.files[0]; if(!f)return;
+ let mode=document.getElementById("importMode").value;
+ let r=new FileReader();
+ r.onload=()=>{
+  let lines=r.result.split(/\r?\n/).slice(1);
+  let imp=[];
+  lines.forEach(l=>{
+   if(!l.trim())return;
+   let c=l.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+   let xy=c[2].replace(/"/g,"").split(",");
+   imp.push({
+    id:Date.now()+Math.random(),
+    type:c[0].replace(/"/g,""),
+    ruas:"",
+    sta:"",
+    lat:+xy[0],lng:+xy[1],
+    time:c[3].replace(/"/g,""),
+    gmaps:c[4].replace(/"/g,"")
+   });
   });
+  data = mode==="replace" ? imp : data.concat(imp);
+  saveLocal();renderLayers();
+ };
+ r.readAsText(f);
+});
 
-  if(bestRoad){
-    d.ruas=bestRoad.name;
-    d.sta="STA "+Math.floor(bestSta/1000)+"+"+
-      Math.floor(bestSta%1000).toString().padStart(3,"0");
-  }
-
-  done++;
-  const pct=Math.round(done/total*100);
-  bar.value=pct; txt.innerText=pct+"%";
-  await new Promise(r=>setTimeout(r,0)); // allow UI refresh
+function resetData(){
+ if(confirm("Reset semua data?")){
+  data=[];saveLocal();renderLayers();
  }
-
- save(); render();
- document.getElementById("status").innerText="Generate selesai ✔";
 }
 
-/* ================= INIT ================= */
-render();
+renderLayers();
 </script>
 </body>
 </html>
