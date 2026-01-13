@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cari Ruas & STA</title>
+<title>Cari Ruas & STA (Klik Peta)</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
@@ -59,7 +59,7 @@ button.secondary{background:#455a64}
     <option value="">-- Pilih Ruas --</option>
   </select>
 
-  <label>STA (contoh: 91+138)</label>
+  <label>STA (contoh: 2+774)</label>
   <input id="staInput" placeholder="Masukkan STA">
 
   <button onclick="generateFromSTA()">Generate dari STA</button>
@@ -82,7 +82,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 let marker=null;
 let lastLatLng=null;
 
-/* ===================== LOAD DATA ===================== */
+/* ===================== LOAD ROADS ===================== */
 fetch("roads.json").then(r=>r.json()).then(j=>{
   roads=j;
   const sel=document.getElementById("ruasSelect");
@@ -94,56 +94,68 @@ fetch("roads.json").then(r=>r.json()).then(j=>{
   });
 });
 
-/* ===================== UTIL ===================== */
+/* ===================== GEO UTIL ===================== */
 const R=6371000;
 const toRad=d=>d*Math.PI/180;
-function dist(a,b,c,d){
+
+function hav(a,b,c,d){
   const dLat=toRad(c-a),dLng=toRad(d-b);
   const x=Math.sin(dLat/2)**2+
     Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLng/2)**2;
   return 2*R*Math.asin(Math.sqrt(x));
 }
+
+function projectPoint(px,py,ax,ay,bx,by){
+  const dx=bx-ax, dy=by-ay;
+  const t=((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy);
+  const tt=Math.max(0,Math.min(1,t));
+  return {
+    x:ax+dx*tt,
+    y:ay+dy*tt,
+    t:tt
+  };
+}
+
 function parseSTA(s){
-  if(s.includes("+")){
-    const [km,m]=s.split("+").map(Number);
-    return km*1000+m;
-  }
-  return Number(s);
+  if(!s.includes("+")) return Number(s);
+  const [km,m]=s.split("+").map(Number);
+  return km*1000+m;
 }
 function formatSTA(m){
-  const km=Math.floor(m/1000);
-  const r=m%1000;
+  const v=Math.round(m);
+  const km=Math.floor(v/1000);
+  const r=v%1000;
   return `STA ${km}+${String(r).padStart(3,"0")}`;
 }
 
-/* ===================== GENERATE FROM STA ===================== */
+/* ===================== FROM STA ===================== */
 function generateFromSTA(){
   const idx=document.getElementById("ruasSelect").value;
   const staStr=document.getElementById("staInput").value;
   if(idx===""||!staStr){alert("Pilih ruas dan isi STA");return;}
-  const sta=parseSTA(staStr);
+
   const road=roads[idx];
-  let s=sta-road.sta_start;
+  let s=parseSTA(staStr)-road.sta_start;
   if(s<0){alert("STA sebelum awal ruas");return;}
 
   let lat,lng;
   for(let i=0;i<road.polyline.length-1;i++){
     const [lng1,lat1]=road.polyline[i];
     const [lng2,lat2]=road.polyline[i+1];
-    const seg=dist(lat1,lng1,lat2,lng2);
+    const seg=hav(lat1,lng1,lat2,lng2);
     if(s<=seg){
-      const r=s/seg;
-      lat=lat1+(lat2-lat1)*r;
-      lng=lng1+(lng2-lng1)*r;
+      const t=s/seg;
+      lat=lat1+(lat2-lat1)*t;
+      lng=lng1+(lng2-lng1)*t;
       break;
     }
     s-=seg;
   }
-  if(lat==null){alert("STA melebihi ruas");return;}
-  showResult(lat,lng,road.name,sta);
+  if(lat==null){alert("STA melebihi panjang ruas");return;}
+  showResult(lat,lng,road.name,parseSTA(staStr));
 }
 
-/* ===================== CLICK MAP → FIND STA ===================== */
+/* ===================== CLICK MAP ===================== */
 map.on("click",e=>{
   const {lat,lng}=e.latlng;
   let best={d:Infinity};
@@ -153,19 +165,20 @@ map.on("click",e=>{
     for(let i=0;i<r.polyline.length-1;i++){
       const [lng1,lat1]=r.polyline[i];
       const [lng2,lat2]=r.polyline[i+1];
-      const d1=dist(lat,lng,lat1,lng1);
-      const d2=dist(lat,lng,lat2,lng2);
-      const seg=dist(lat1,lng1,lat2,lng2);
-      const p=Math.min(d1+d2,seg);
-      if(p<best.d){
+
+      const p=projectPoint(lng,lat,lng1,lat1,lng2,lat2);
+      const d=hav(lat,lng,p.y,p.x);
+
+      if(d<best.d){
+        const seg=hav(lat1,lng1,lat2,lng2);
         best={
-          d:p,
-          road:r,
+          d,
           ri,
-          sta:r.sta_start+acc
+          road:r,
+          sta:r.sta_start+acc+p.t*seg
         };
       }
-      acc+=seg;
+      acc+=hav(lat1,lng1,lat2,lng2);
     }
   });
 
