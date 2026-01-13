@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cari Lokasi Berdasarkan STA</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f4f6f8}
+h2{margin:10px;font-size:18px}
+
+.card{
+  background:#fff;
+  margin:10px;
+  padding:12px;
+  border-radius:10px;
+  box-shadow:0 2px 6px rgba(0,0,0,.15)
+}
+
+label{font-size:14px;font-weight:bold}
+select,input{
+  width:100%;
+  padding:8px;
+  margin-top:6px;
+  margin-bottom:10px;
+  font-size:14px
+}
+
+button{
+  padding:10px 14px;
+  border:none;
+  border-radius:8px;
+  font-size:14px;
+  cursor:pointer;
+  color:#fff;
+  background:#0277bd
+}
+
+button.secondary{background:#455a64}
+
+#map{
+  height:50vh;
+  margin:10px;
+  border-radius:10px
+}
+
+.info{
+  font-size:14px;
+  margin-top:8px
+}
+</style>
+</head>
+
+<body>
+
+<h2>Cari Lokasi Berdasarkan Ruas & STA</h2>
+
+<div class="card">
+  <label>Nama Ruas Jalan</label>
+  <select id="ruasSelect">
+    <option value="">-- Pilih Ruas --</option>
+  </select>
+
+  <label>STA (contoh: 91+138 atau 91138)</label>
+  <input type="text" id="staInput" placeholder="Masukkan STA">
+
+  <button onclick="generatePoint()">Generate Lokasi</button>
+</div>
+
+<div id="map"></div>
+
+<div class="card" id="resultCard" style="display:none">
+  <div class="info" id="resultText"></div>
+  <br>
+  <button class="secondary" onclick="openGmaps()">Buka di Google Maps</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+let roads=[];
+let map=L.map('map').setView([-8.56,115.17],14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+let marker=null;
+let lastLatLng=null;
+
+/* =====================
+   LOAD ROADS.JSON
+===================== */
+fetch("roads.json")
+.then(r=>r.json())
+.then(j=>{
+  roads=j;
+  const sel=document.getElementById("ruasSelect");
+  j.forEach((r,i)=>{
+    let opt=document.createElement("option");
+    opt.value=i;
+    opt.textContent=r.name;
+    sel.appendChild(opt);
+  });
+});
+
+/* =====================
+   UTIL
+===================== */
+function toRad(d){return d*Math.PI/180}
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000;
+  const dLat=toRad(lat2-lat1);
+  const dLng=toRad(lng2-lng1);
+  const a=Math.sin(dLat/2)**2+
+    Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*
+    Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function parseSTA(s){
+  s=s.trim();
+  if(s.includes("+")){
+    const [km,m]=s.split("+").map(Number);
+    return km*1000+m;
+  }
+  return Number(s);
+}
+
+/* =====================
+   GENERATE POINT
+===================== */
+function generatePoint(){
+  const idx=document.getElementById("ruasSelect").value;
+  const staStr=document.getElementById("staInput").value;
+
+  if(idx===""){
+    alert("Silakan pilih nama ruas");
+    return;
+  }
+  if(!staStr){
+    alert("Silakan masukkan STA");
+    return;
+  }
+
+  const staTarget=parseSTA(staStr);
+  if(isNaN(staTarget)){
+    alert("Format STA tidak valid");
+    return;
+  }
+
+  const road=roads[idx];
+  let sisa=staTarget-road.sta_start;
+  if(sisa<0){
+    alert("STA lebih kecil dari STA awal ruas");
+    return;
+  }
+
+  let lat=null,lng=null;
+
+  for(let i=0;i<road.polyline.length-1;i++){
+    const [lng1,lat1]=road.polyline[i];
+    const [lng2,lat2]=road.polyline[i+1];
+    const segLen=haversine(lat1,lng1,lat2,lng2);
+
+    if(sisa<=segLen){
+      const r=sisa/segLen;
+      lat=lat1+(lat2-lat1)*r;
+      lng=lng1+(lng2-lng1)*r;
+      break;
+    }
+    sisa-=segLen;
+  }
+
+  if(lat===null){
+    alert("STA melebihi panjang ruas");
+    return;
+  }
+
+  if(marker) map.removeLayer(marker);
+  marker=L.circleMarker([lat,lng],{
+    radius:8,
+    color:"#1565c0",
+    fillColor:"#2196f3",
+    fillOpacity:0.9
+  }).addTo(map);
+
+  map.setView([lat,lng],18);
+  lastLatLng={lat,lng};
+
+  document.getElementById("resultText").innerHTML=
+    `<b>${road.name}</b><br>
+     STA ${staStr}<br>
+     Koordinat: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+  document.getElementById("resultCard").style.display="block";
+}
+
+function openGmaps(){
+  if(!lastLatLng) return;
+  window.open(
+    `https://www.google.com/maps?q=${lastLatLng.lat},${lastLatLng.lng}`,
+    "_blank"
+  );
+}
+</script>
+
+</body>
+</html>
