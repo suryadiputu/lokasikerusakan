@@ -7,6 +7,11 @@
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
+<!-- ===================== SELECT2 ===================== -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
 <style>
 body{margin:0;font-family:Arial;background:#f4f6f8}
 h2{margin:10px;font-size:18px}
@@ -82,16 +87,28 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 let marker=null;
 let lastLatLng=null;
 
+/* ===================== ENABLE SELECT2 ===================== */
+$(document).ready(function() {
+    $('#ruasSelect').select2({
+        placeholder: "-- Pilih Ruas --",
+        width: "100%"
+    });
+});
+
 /* ===================== LOAD ROADS ===================== */
 fetch("roads.json").then(r=>r.json()).then(j=>{
   roads=j;
   const sel=document.getElementById("ruasSelect");
+
   j.forEach((r,i)=>{
     const o=document.createElement("option");
     o.value=i;
     o.textContent=r.name;
     sel.appendChild(o);
   });
+
+  // refresh Select2 setelah option dimasukkan
+  $('#ruasSelect').trigger('change');
 });
 
 /* ===================== GEO UTIL ===================== */
@@ -109,11 +126,7 @@ function projectPoint(px,py,ax,ay,bx,by){
   const dx=bx-ax, dy=by-ay;
   const t=((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy);
   const tt=Math.max(0,Math.min(1,t));
-  return {
-    x:ax+dx*tt,
-    y:ay+dy*tt,
-    t:tt
-  };
+  return {x:ax+dx*tt, y:ay+dy*tt, t:tt};
 }
 
 function parseSTA(s){
@@ -141,7 +154,7 @@ function generateFromSTA(){
   let lat,lng;
   for(let i=0;i<road.polyline.length-1;i++){
     const [lng1,lat1]=road.polyline[i];
-    const [lng2,lat2]=road.polyline[i+1];
+    const [lng2,lat2]=road.polyline[i];
     const seg=hav(lat1,lng1,lat2,lng2);
     if(s<=seg){
       const t=s/seg;
@@ -171,18 +184,13 @@ map.on("click",e=>{
 
       if(d<best.d){
         const seg=hav(lat1,lng1,lat2,lng2);
-        best={
-          d,
-          ri,
-          road:r,
-          sta:r.sta_start+acc+p.t*seg
-        };
+        best={d, ri, road:r, sta:r.sta_start+acc+p.t*seg};
       }
       acc+=hav(lat1,lng1,lat2,lng2);
     }
   });
 
-  document.getElementById("ruasSelect").value=best.ri;
+  $('#ruasSelect').val(best.ri).trigger('change');
   document.getElementById("staInput").value=formatSTA(best.sta).replace("STA ","");
   showResult(lat,lng,best.road.name,best.sta);
 });
