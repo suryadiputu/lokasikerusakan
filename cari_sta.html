@@ -253,6 +253,33 @@ function gotoCurrentLocation(){
       const lat=pos.coords.latitude;
       const lng=pos.coords.longitude;
 
+      // ================== SNAP KE RUAS TERDEKAT ==================
+      let best={d:Infinity};
+
+      roads.forEach((r,ri)=>{
+        let acc=0;
+
+        for(let i=0;i<r.polyline.length-1;i++){
+          const [lng1,lat1]=r.polyline[i];
+          const [lng2,lat2]=r.polyline[i+1];
+
+          const p=projectPoint(lng,lat,lng1,lat1,lng2,lat2);
+          const d=hav(lat,lng,p.y,p.x);
+
+          if(d<best.d){
+            const seg=hav(lat1,lng1,lat2,lng2);
+            best={
+              d,
+              ri,
+              road:r,
+              sta:r.sta_start + acc + p.t * seg
+            };
+          }
+          acc+=hav(lat1,lng1,lat2,lng2);
+        }
+      });
+
+      // ================== TAMPILKAN MARKER ==================
       if(marker) map.removeLayer(marker);
 
       marker=L.circleMarker([lat,lng],{
@@ -264,10 +291,17 @@ function gotoCurrentLocation(){
       map.setView([lat,lng],18);
       lastLatLng={lat,lng};
 
+      // Update dropdown ruas
+      $('#ruasSelect').val(best.ri).trigger("change");
+
+      // ================== UPDATE INFO ==================
       document.getElementById("infoText").innerHTML =
-        `<b>Lokasi Saat Ini</b><br>${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        `<b>${best.road.name}</b><br>${formatSTA(best.sta)}<br>` +
+        `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
       document.getElementById("infoCard").style.display="block";
     },
+
     err=>{
       alert("Gagal mendapatkan lokasi: " + err.message);
     },
