@@ -154,7 +154,8 @@ function generateFromSTA(){
   let lat,lng;
   for(let i=0;i<road.polyline.length-1;i++){
     const [lng1,lat1]=road.polyline[i];
-    const [lng2,lat2]=road.polyline[i];
+    const [lng2,lat2]=road.polyline[i+1];   // ✔ FIX
+
     const seg=hav(lat1,lng1,lat2,lng2);
     if(s<=seg){
       const t=s/seg;
@@ -164,6 +165,7 @@ function generateFromSTA(){
     }
     s-=seg;
   }
+
   if(lat==null){alert("STA melebihi panjang ruas");return;}
   showResult(lat,lng,road.name,parseSTA(staStr));
 }
